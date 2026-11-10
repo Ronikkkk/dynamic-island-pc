@@ -1,0 +1,153 @@
+<title>Island for Windows — конфиденциальность</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Палитра: нейтральная бумага с лёгким холодным оттенком + один акцент острова.
+   Шрифты: Fraunces (заголовки, с характером) + Inter (текст, для долгого чтения).
+   Макет: один столбец ~64ch, боковая метка раздела вместо нумерации — читается как документ. */
+:root{
+  --bg:#f6f5f2; --panel:#ffffff; --ink:#1c1b19; --sub:#5c594f; --line:#e4e1d8;
+  --accent:#2f6f5e; --accent-ink:#eaf5f1;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15140f; --panel:#1d1c16; --ink:#efece2; --sub:#b4b0a0; --line:#34321f;
+    --accent:#6fc7a9; --accent-ink:#0f241c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15140f; --panel:#1d1c16; --ink:#efece2; --sub:#b4b0a0; --line:#34321f;
+  --accent:#6fc7a9; --accent-ink:#0f241c; color-scheme: dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px; line-height:1.6;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+}
+h1,h2{font-family:"Fraunces","Iowan Old Style",Georgia,serif; text-wrap:balance; margin:0}
+.wrap{max-width:760px; margin:0 auto; padding-block:56px 72px}
+header{padding-bottom:28px; border-bottom:1px solid var(--line); margin-bottom:36px}
+.eyebrow{font-size:12.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--accent); font-weight:600}
+h1{font-size:clamp(28px,5vw,38px); font-weight:600; margin-top:10px; color:var(--ink)}
+.meta{color:var(--sub); font-size:14px; margin-top:10px}
+.summary{
+  background:var(--panel); border:1px solid var(--line); border-radius:14px;
+  padding:20px 22px; margin:28px 0 40px; display:flex; gap:14px; align-items:flex-start;
+}
+.summary .dot{width:9px;height:9px;border-radius:50%;background:var(--accent); margin-top:7px; flex:none}
+.summary p{margin:0; color:var(--ink); max-width:65ch}
+section{display:grid; grid-template-columns:140px 1fr; gap:24px; padding:26px 0; border-top:1px solid var(--line)}
+section:first-of-type{border-top:none}
+section h2{font-size:19px; font-weight:600; color:var(--ink)}
+section .tag{font-size:12.5px; color:var(--sub); letter-spacing:.04em; text-transform:uppercase; padding-top:2px}
+section .body{max-width:62ch; color:var(--ink)}
+section .body p{margin:0 0 12px}
+section .body p:last-child{margin-bottom:0}
+section .body ul{margin:0 0 12px; padding-left:20px}
+section .body li{margin-bottom:6px}
+code{
+  background:var(--panel); border:1px solid var(--line); border-radius:5px;
+  padding:1px 6px; font-size:.92em; font-family:ui-monospace,Menlo,Consolas,monospace;
+}
+.sub{color:var(--sub)}
+footer{margin-top:48px; padding-top:24px; border-top:1px solid var(--line); color:var(--sub); font-size:14.5px}
+footer strong{color:var(--ink)}
+.copybtn{
+  margin-top:10px; display:inline-flex; align-items:center; gap:8px; background:var(--panel);
+  border:1px solid var(--line); color:var(--ink); border-radius:999px; padding:8px 14px;
+  font:inherit; font-size:14px; cursor:pointer;
+}
+.copybtn:hover{border-color:var(--accent)}
+.copybtn svg{width:14px;height:14px;stroke:var(--accent)}
+@media (max-width:620px){
+  section{grid-template-columns:1fr; gap:6px}
+}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap">
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Island for Windows</div>
+    <h1>Политика конфиденциальности</h1>
+    <div class="meta">Действует с 1 ноября 2026 года · относится к приложению Island for Windows для Windows 10/11</div>
+  </header>
+
+  <div class="summary">
+    <span class="dot"></span>
+    <p>Коротко: Island for Windows — программа для одного компьютера. Она не отправляет данные на сервер, не показывает рекламу и не требует регистрации. Всё, что программа читает, остаётся на вашем компьютере и используется только для работы самой программы.</p>
+  </div>
+
+  <section>
+    <div class="tag">Что читает</div>
+    <div class="body">
+      <h2>Данные, которые использует программа</h2>
+      <p><strong>Код компьютера.</strong> Программа считает его на устройстве из системного идентификатора Windows и использует только для проверки лицензии. Код не передаётся автоматически никуда — вы сами решаете, показать ли его при покупке.</p>
+      <p><strong>Текущий трек.</strong> Название, исполнитель и обложка альбома — из системной медиа-сессии Windows (это те же данные, что видны в центре уведомлений). Используются только для показа в «острове».</p>
+      <p><strong>Активное окно.</strong> Название запущенной программы — чтобы автоматически скрывать остров поверх игр и полноэкранных окон, а также чтобы считать время в приложениях для сводки дня.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="tag">Где хранится</div>
+    <div class="body">
+      <h2>Хранение данных</h2>
+      <p>Все данные хранятся локально, в папке программы на вашем компьютере, и не синхронизируются ни с каким сервером. Удаление программы удаляет и эти данные.</p>
+      <p>Программа не использует аналитику, трекеры и рекламные идентификаторы.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="tag">Покупка Pro</div>
+    <div class="body">
+      <h2>Платная версия</h2>
+      <p>Чтобы оформить Pro, вы по собственному желанию открываете отдельный чат с Telegram-ботом разработчика и пишете ему код компьютера. Эта переписка идёт через Telegram и подчиняется политике конфиденциальности Telegram, а не этой программы.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="tag">Дети</div>
+    <div class="body">
+      <h2>Возрастные ограничения</h2>
+      <p>Island for Windows не предназначена специально для детей и не собирает данные о них осознанно.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="tag">Изменения</div>
+    <div class="body">
+      <h2>Обновления политики</h2>
+      <p>Если условия изменятся, новая версия появится на этой же странице с обновлённой датой наверху.</p>
+    </div>
+  </section>
+
+  <footer>
+    <div><strong>Вопросы по конфиденциальности</strong></div>
+    <div style="margin-top:6px">ronikkyt@gmail.com</div>
+    <button class="copybtn" id="copyEmail" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Скопировать адрес
+    </button>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var btn = document.getElementById('copyEmail');
+  if (!btn) return;
+  btn.addEventListener('click', function(){
+    var email = 'ronikkyt@gmail.com';
+    function done(){ var t = btn.textContent; btn.textContent = 'Скопировано'; setTimeout(function(){ btn.innerHTML = btn.innerHTML.replace('Скопировано','Скопировать адрес'); }, 1600); }
+    try {
+      navigator.clipboard.writeText(email).then(done, fallback);
+    } catch(e){ fallback(); }
+    function fallback(){
+      try {
+        var r = document.createRange(); var el = document.querySelector('footer div + div');
+        r.selectNodeContents(el); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      } catch(e){}
+    }
+  });
+})();
+</script>

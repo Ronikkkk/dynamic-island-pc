@@ -1,0 +1,72 @@
+{
+  "name": "dynamic-island-pc",
+  "version": "1.0.3",
+  "description": "Остров для рабочего стола Windows",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64",
+    "dist:store": "electron-builder --win appx --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.corzyyy.islandforwindows",
+    "productName": "Island for Windows",
+    "asar": true,
+    "directories": {
+      "output": "dist-out"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "license.js",
+      "index.html",
+      "media.ps1",
+      "icon.ps1",
+      "volume.ps1",
+      "notif.ps1",
+      "toastact.ps1",
+      "assets/**/*",
+      "!README.md",
+      "!*.log",
+      "!*.json"
+    ],
+    "extraResources": [],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/tray-256.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "artifactName": "IslandForWindows-Setup-${version}.exe",
+      "createDesktopShortcut": true,
+      "shortcutName": "Island for Windows",
+      "license": "license.txt",
+      "language": "1049"
+    },
+    "asarUnpack": [
+      "*.ps1",
+      "assets/**/*"
+    ],
+    "appx": {
+      "identityName": "corzyyy.DynamicIslandforPC",
+      "publisher": "CN=32522B6E-AC0D-485E-94FA-5134E41D64E9",
+      "publisherDisplayName": "corzyyy",
+      "displayName": "Dynamic Island for PC",
+      "applicationId": "DynamicIslandforPC",
+      "languages": ["ru-RU"]
+    }
+  }
+}

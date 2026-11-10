@@ -1,0 +1,82 @@
+PRIVACY POLICY AND TERMS OF USE
+Island for Windows (a desktop "island" for Windows)
+Author: corzyyy · Telegram: https://t.me/corzyyy
+Document version: October 29, 2026
+
+Please read this document carefully before installing. By clicking "I Accept" you agree to it. If you disagree, click "Cancel": the program will not be installed.
+
+================================================================
+PART 1. PRIVACY POLICY
+================================================================
+
+1. The short version
+The program runs on your computer. It has no accounts, ads or analytics. The author does not receive any of your data and does not collect it.
+
+2. What data the program processes on your computer
+- Playback information from Windows: track title, artist, cover art, player state and the name of the player app. Needed to show and control music playback.
+- The name of the active window (process) and time spent in apps during the day. Needed for the Home card, "Do Not Disturb" mode and the "Day summary" tab. The program does not read window contents, keystrokes or files.
+- Daily statistics: number of screenshots taken, number of tracks listened to, time spent in "Do Not Disturb" mode, number of completed timers.
+- Your notes, reminders, favorite tracks, list of pinned apps, appearance settings, and the background image and notification sound you chose (copies of these files).
+- Battery level, current time, and CPU/RAM load (Home card block). These values are only displayed and are never saved anywhere.
+
+3. Where this is stored
+Everything listed above is saved only in local program files on your computer (in the app data folder or next to the program) and is never sent anywhere. The work log (media.log) is also stored locally and contains technical entries, such as track names.
+
+4. Internet access
+- Weather (optional): by default the weather block is off, and the program does not access the internet for weather. If you enable the "Weather" block in the "Design" tab, the program requests an approximate location from your IP address via the ipwho.is service, then a forecast from the Open-Meteo service (open-meteo.com, data under the CC BY 4.0 license) using those coordinates. These services see your IP address. This data is not passed to the author of the program. These services' own policies apply independently of this document.
+- Links: clicking "corzyyy" opens https://t.me/corzyyy. Clicking a favorite track may open a search for that track in Yandex Music (in your browser) or in Spotify. Such links open only when you click them.
+- There is no other exchange of data with the internet.
+
+5. Changes to the system
+- "Do Not Disturb" mode temporarily changes Windows notification settings for the current user (in the registry) while active, and restores them when the mode is turned off. If the program crashes, the settings are restored on the next launch.
+- Autostart adds the program to the current user's startup list. It can be turned off from the "Design" tab or the tray icon's menu.
+- Volume, files and settings of other programs are not changed.
+
+6. How to delete your data
+Remove the program via "Settings → Apps" and then delete its data folder. You can copy any files you need (notes, settings) beforehand. Data is not stored anywhere except your own computer.
+
+7. Changes to this policy
+New versions of the program may update this document. The current version is shown during installation.
+
+================================================================
+PART 2. TERMS OF USE
+================================================================
+
+1. License
+The author grants you a free, non-exclusive right to install and use the program for personal, non-commercial purposes on your own devices. The unmodified installer may be distributed free of charge and with attribution to the author (corzyyy). All rights to the program, its source code, design, names and materials belong to the author and are not transferred to you: you receive only a right to use it.
+
+2. Prohibited actions
+Without the author's written permission, it is prohibited to:
+- copy, steal or claim the program, its code, design, text and other materials, in whole or in part, present them as your own, or publish them under another name;
+- sell the program, rent it out, or otherwise use it for profit;
+- remove or alter attribution, including the "tg: corzyyy" signature and the Telegram link, as well as the license and this document;
+- distribute modified, repackaged or rebuilt versions of the program, or versions with added code, including ads, miners, spyware, malware or other harmful code;
+- hack the program, bypass or disable its restrictions and protection, inject into its processes, replace its files, or alter its behavior in ways not provided for by the author;
+- decompile, disassemble or analyze the program in order to obtain its source code and use it to create copies, analogs or other products, except as permitted by law;
+- use the program or parts of it to break the law, to spy on other people, or to harm other programs, devices or data;
+- create and distribute "cracked", "pirated" or counterfeit versions of the program and present them as the original.
+The author is entitled to take any measures permitted by law to protect their rights, including demanding the removal of copies and contacting the platforms where they are hosted.
+
+3. "As is"
+The program is provided without any warranties: the author does not guarantee uninterrupted operation, the absence of errors, or compatibility with all versions of Windows and all applications.
+
+4. Limitation of liability
+The author is not liable for losses or consequences arising from use of the program, including missed notifications and reminders (for example, during "Do Not Disturb" mode), inaccurate time, weather or app data, or malfunctions in other programs. You use the program at your own risk.
+
+5. Third-party services and names
+Yandex Music, Spotify, Telegram, Windows and other names belong to their respective owners. The program is not affiliated with or endorsed by them, and only displays information that Windows reports about playback.
+
+6. Your responsibilities
+You use the program lawfully and comply with the rules of the services and apps it works with. You are responsible for the content of your own notes, background images and sounds.
+
+7. Termination
+You may stop using the program at any time by deleting it. If you violate these terms, your right to use the program ends, and you must delete the program and all its copies. To lawfully continue using paid (Pro) features after a violation, you must purchase a valid license key under the regular terms (see section 8) — a previously issued or improperly used key does not restore your right to use the program. The author may change or discontinue development of the program.
+
+8. Paid license (Pro)
+The free version (Free) contains only the Home page. All other features are unlocked with a license key. Plans: trial (7 days, free), 30 days, 3 months, 6 months, 12 months, lifetime. The key's validity period is counted from the moment it is activated. A key is issued to one buyer and is personal; transferring, reselling or publishing it, as well as bypassing key verification, is prohibited. Key verification is performed on your computer without an internet connection; key information is stored only locally. Payment and refund terms are agreed with the author at the time of purchase (Telegram t.me/corzyyy). The author may refuse support in the event of a violation of these terms.
+
+9. Changes to these terms
+These terms may be updated along with new versions of the program. By continuing to use a new version, you agree to the updated terms.
+
+10. Contacting the author
+Questions and suggestions: Telegram https://t.me/corzyyy (corzyyy).

@@ -7,12 +7,12 @@
   html, body { margin: 0; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; color: var(--txt); user-select: none; }
   button { font-family: inherit; }
   #island {
-    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%) scale(var(--iscale, 1)); transform-origin: top center;
     width: 120px; height: 34px; border-radius: 18px; background: var(--ibg, #000); overflow: hidden;
     box-shadow: 0 8px 24px rgba(0,0,0,.35);
     transition: width .55s cubic-bezier(.3,1.35,.5,1), height .55s cubic-bezier(.3,1.35,.5,1), border-radius .55s cubic-bezier(.3,1.35,.5,1);
   }
-  #island.gone { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-70px); transition: opacity .35s, transform .45s cubic-bezier(.5,0,.8,.4); }
+  #island.gone { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(-70px) scale(var(--iscale, 1)); transition: opacity .35s, transform .45s cubic-bezier(.5,0,.8,.4); }
   #hint {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%) translateY(-12px);
     max-width: 420px; padding: 8px 16px; border-radius: 999px; background: #000; color: #fff;
@@ -29,6 +29,43 @@
   #island[data-mode="full"][data-tab="home"] { height: 352px; }
   #island[data-mode="full"][data-tab="notes"] { height: 312px; }
   #island[data-mode="full"][data-tab="day"] { height: 384px; }
+  #island[data-mode="full"][data-tab="custom"] { height: 560px; }
+  #p-custom { overflow-y: auto; padding-right: 2px; }
+  #p-home [data-widget].cust-hidden { display: none !important; }
+  /* Стыковка к стене (положение «Слева»/«Справа»): остров вплотную к краю экрана,
+     а в свёрнутом виде — маленький флажок-ручка, за который его можно снова открыть. */
+  #island[data-dock="left"]  { left: 0; right: auto; transform: translateX(0) scale(var(--iscale, 1)); transform-origin: top left; }
+  #island[data-dock="right"] { left: auto; right: 0; transform: translateX(0) scale(var(--iscale, 1)); transform-origin: top right; }
+  #island[data-dock="left"].gone  { transform: translateX(-60px) scale(var(--iscale, 1)); }
+  #island[data-dock="right"].gone { transform: translateX(60px) scale(var(--iscale, 1)); }
+  /* Свёрнутый вид у стены (и когда ничего не играет, и с музыкой) — узкая вертикальная полоска вплотную к краю. */
+  #island[data-dock][data-mode="idle"], #island[data-dock][data-mode="multi"], #island[data-dock][data-mode="pop"] {
+    width: 42px !important; height: 200px; top: 36px;
+  }
+  #island[data-dock="left"][data-mode="idle"], #island[data-dock="left"][data-mode="multi"], #island[data-dock="left"][data-mode="pop"] { border-radius: 0 18px 18px 0; }
+  #island[data-dock="right"][data-mode="idle"], #island[data-dock="right"][data-mode="multi"], #island[data-dock="right"][data-mode="pop"] { border-radius: 18px 0 0 18px; }
+  #island[data-dock][data-mode="idle"] .idle, #island[data-dock][data-mode="multi"] .multi, #island[data-dock][data-mode="pop"] .pop { opacity: 0 !important; pointer-events: none; }
+  .dockv { flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--txt); font-size: 15px; font-weight: 700; line-height: 1; }
+  #island[data-dock][data-mode="idle"] .dockv, #island[data-dock][data-mode="multi"] .dockv, #island[data-dock][data-mode="pop"] .dockv { opacity: 1; transition: opacity .25s .15s; }
+  .dvcv { width: 28px; height: 28px; border-radius: 8px; background: center / cover no-repeat; margin-bottom: 6px; }
+  .dveq { display: flex; align-items: flex-end; gap: 2px; height: 14px; margin-top: 8px; }
+  .dveq[hidden] { display: none; }
+  .dveq i { width: 3px; background: var(--txt); border-radius: 2px; animation: dveq 0.9s ease-in-out infinite; }
+  .dveq i:nth-child(2) { animation-delay: .2s; } .dveq i:nth-child(3) { animation-delay: .4s; }
+  @keyframes dveq { 0%, 100% { height: 4px; } 50% { height: 14px; } }
+  body[data-dock] #hint { display: none; }
+  /* Подсветка во время перетаскивания — «вот-вот прилипнет», видна прямо на маленьком острове,
+     пока его тащишь к краю, чтобы было понятно где отпустить, а не на глаз угадывать. */
+  #island.snap-near { box-shadow: 0 0 0 3px #4ea1ff, 0 8px 24px rgba(0,0,0,.35); }
+  #dragRow { padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--txt) 9%, transparent); user-select: none; }
+  #dragRow:active { background: color-mix(in srgb, var(--txt) 16%, transparent); }
+  .dgrip { font-size: 13px; letter-spacing: -2px; opacity: .6; }
+  .torder { max-height: 148px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
+  .trow { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 10px; background: color-mix(in srgb, var(--txt) 7%, transparent); font-size: 12px; }
+  .trow .tbtns { display: flex; gap: 3px; }
+  .trow button { width: 20px; height: 20px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--txt) 14%, transparent); color: var(--txt); cursor: pointer; font-size: 11px; line-height: 1; }
+  .trow button:disabled { opacity: .3; cursor: default; }
+  .trow button:not(:disabled):hover { background: color-mix(in srgb, var(--txt) 24%, transparent); }
 
   #island::before { content: ""; position: absolute; left: 50%; top: 0; width: 460px; height: 360px; transform: translateX(-50%); background: var(--bgimg, none) center / cover no-repeat; filter: blur(var(--bgblur, 0px)); opacity: 0; transition: opacity .3s; }
   #island::after { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,var(--dim, 0)); opacity: 0; z-index: 1; pointer-events: none; }
@@ -408,6 +445,7 @@
 <div id="hint"></div>
 <div id="island" data-mode="idle" data-tab="home">
   <div class="layer idle"><span class="mono" id="ic">00:00</span></div>
+  <div class="layer dockv"><div class="dvcv" id="dvCv" hidden></div><span class="mono" id="dvH">00</span><span class="mono" id="dvM">00</span><div class="dveq" id="dvEq" hidden><i></i><i></i><i></i></div></div>
   <div class="layer multi">
     <div class="mm" id="mm"><div class="cv sm" id="cvs"></div><span class="mt" id="mc2">Музыка</span><span class="eq"><i></i><i></i><i></i><i></i></span></div>
     <div class="chip" id="cclk"><span class="mono" id="icm">00:00</span></div>
@@ -436,6 +474,7 @@
         <button class="tab" data-tab="apps" title="Программы"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1.4"/><rect x="9" y="2" width="5" height="5" rx="1.4"/><rect x="2" y="9" width="5" height="5" rx="1.4"/><rect x="9" y="9" width="5" height="5" rx="1.4"/></svg><span class="lbl">Программы</span></button>
         <button class="tab" data-tab="notes" id="tabNotes" title="Заметки и напоминания"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h10v11H3zM5.5 6h5M5.5 8.8h5M5.5 11.3h3"/></svg><span class="lbl">Заметки</span></button>
         <button class="tab" data-tab="design" title="Дизайн"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8c-3.6 0-6.2 2.6-6.2 5.7 0 2.5 2 3.6 3.6 3.6h1c.7 0 1.1.6.8 1.2-.4.9.2 1.9 1.3 1.9 3.3 0 5.7-2.7 5.7-6 0-3.8-2.8-6.4-6.2-6.4z"/><circle cx="5" cy="6.2" r=".6" fill="currentColor"/><circle cx="8" cy="4.8" r=".6" fill="currentColor"/><circle cx="11" cy="6.2" r=".6" fill="currentColor"/></svg><span class="lbl">Дизайн</span></button>
+        <button class="tab" data-tab="custom" id="tabCustom" title="Кастомизация"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h7M2 8h4M2 12h7"/><circle cx="11.5" cy="4" r="1.6" fill="currentColor" stroke="none"/><circle cx="7.5" cy="8" r="1.6" fill="currentColor" stroke="none"/><circle cx="11.5" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg><span class="lbl">Кастом</span></button>
         <button class="tab" id="shot" title="Скриншот области (Win + Shift + S)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.5 1.5v9a1 1 0 0 0 1 1h9M1.5 4.5h9a1 1 0 0 1 1 1v9"/></svg></button>
       </div>
       <div class="xs"><button class="x" id="hide" title="Скрыть остров (Ctrl+Alt+H)">–</button><button class="x" id="quit" title="Закрыть остров (Ctrl+Alt+Q)">✕</button></div>
@@ -443,37 +482,39 @@
 
     <!-- Главная: время, погода, музыка -->
     <div class="pane on" id="p-home">
-      <div class="hrow">
+      <div class="hrow" id="hwClock" data-widget="clock">
         <div><div class="big" id="bt">00:00</div><div class="date" id="bd"></div></div>
         <div class="wx">
           <div class="wi" id="wi"></div>
           <div class="wt"><b id="wtmp">…</b><span id="wd"></span><span class="bat" id="bat"></span></div>
         </div>
       </div>
-      <div class="appc" id="appc" hidden>
+      <div class="appc" id="appc" data-widget="app" hidden>
         <div class="aic" id="aic"></div>
         <div class="ain"><b id="an1">Приложение</b><span id="an2">сегодня</span></div>
         <div class="atm mono" id="atm">00:00:00</div>
       </div>
-      <div class="nomedia" id="nomedia"><b>♪</b><span id="nmTitle">Сейчас ничего не играет</span><span id="nmSub">Включи музыку в Яндекс Музыке, Spotify или браузере</span></div>
-      <div class="media" id="media" hidden>
-        <div class="mrow">
-          <div class="cv lg" id="cvl"></div>
-          <div class="mi"><b id="mt">Музыка</b><span id="ma"></span></div>
-        </div>
-        <div class="seek">
-          <span class="mono" id="sp">0:00</span>
-          <input type="range" id="seek" min="0" max="1000" step="1" value="0">
-          <span class="mono" id="sd">0:00</span>
-        </div>
-        <div class="ctl">
-          <button class="side l" id="shuf" title="Перемешать"><span class="ic" id="shufi" data-ic="shuffle"></span></button>
-          <button class="side favl" id="favBtn" title="В избранное"><span class="plg" id="favIc">♡</span></button>
-          <button class="sk" data-m="prev" title="Предыдущий трек"><span class="ic" data-ic="prev"></span></button>
-          <button class="pp" id="mpp" data-m="toggle" title="Пауза / играть"><span class="ppc" id="mppi"><svg viewBox="0 0 24 24"><path id="mppp" d="M7 5h3.6v14H7zM13.4 5H17v14h-3.4z"/></svg></span></button>
-          <button class="sk" data-m="next" title="Следующий трек"><span class="ic" data-ic="next"></span></button>
-          <button class="side plb" id="plBtn" title="Любимые треки"><span class="plg">☰</span></button>
-          <button class="side r" id="rep" title="Повтор"><span class="ic" id="repi" data-ic="repeat"></span></button>
+      <div id="hwMedia" data-widget="media">
+        <div class="nomedia" id="nomedia"><b>♪</b><span id="nmTitle">Сейчас ничего не играет</span><span id="nmSub">Включи музыку в Яндекс Музыке, Spotify или браузере</span></div>
+        <div class="media" id="media" hidden>
+          <div class="mrow">
+            <div class="cv lg" id="cvl"></div>
+            <div class="mi"><b id="mt">Музыка</b><span id="ma"></span></div>
+          </div>
+          <div class="seek">
+            <span class="mono" id="sp">0:00</span>
+            <input type="range" id="seek" min="0" max="1000" step="1" value="0">
+            <span class="mono" id="sd">0:00</span>
+          </div>
+          <div class="ctl">
+            <button class="side l" id="shuf" title="Перемешать"><span class="ic" id="shufi" data-ic="shuffle"></span></button>
+            <button class="side favl" id="favBtn" title="В избранное"><span class="plg" id="favIc">♡</span></button>
+            <button class="sk" data-m="prev" title="Предыдущий трек"><span class="ic" data-ic="prev"></span></button>
+            <button class="pp" id="mpp" data-m="toggle" title="Пауза / играть"><span class="ppc" id="mppi"><svg viewBox="0 0 24 24"><path id="mppp" d="M7 5h3.6v14H7zM13.4 5H17v14h-3.4z"/></svg></span></button>
+            <button class="sk" data-m="next" title="Следующий трек"><span class="ic" data-ic="next"></span></button>
+            <button class="side plb" id="plBtn" title="Любимые треки"><span class="plg">☰</span></button>
+            <button class="side r" id="rep" title="Повтор"><span class="ic" id="repi" data-ic="repeat"></span></button>
+          </div>
         </div>
       </div>
       <div class="favpanel" id="favpanel" hidden>
@@ -559,6 +600,30 @@
           <button class="b sm" id="soundPick">Выбрать файл</button>
           <button class="b sm" id="soundClear" hidden>Сбросить</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Кастомизация -->
+    <div class="pane" id="p-custom">
+      <div class="dsec">
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="posLbl">Положение на экране</span><div class="dseg" id="posseg"><button data-pos="left">Слева</button><button data-pos="center">Центр</button><button data-pos="right">Справа</button></div></div>
+        <div class="drow" id="dragRow" style="gap:8px;cursor:move"><span class="dgrip">⠿⠿</span><span class="dl" id="dragLbl" style="opacity:.8">Перетащи сюда, чтобы поставить остров куда хочешь</span></div>
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="sizeLbl">Размер острова</span><div class="dseg" id="sizeseg"><button data-size="small">S</button><button data-size="medium">M</button><button data-size="large">L</button></div></div>
+      </div>
+      <div class="dsec">
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="greetLbl">Своё приветствие</span><button class="b sm" id="greetReset">Авто</button></div>
+        <div class="drow"><input type="text" id="greetInput" maxlength="60" placeholder="Напр.: Привет, босс! 👋" style="flex:1;background:color-mix(in srgb, var(--txt) 9%, transparent);border:0;border-radius:10px;padding:7px 10px;color:var(--txt);font-size:12.5px"></div>
+      </div>
+      <div class="dsec">
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="orderLbl">Порядок вкладок</span></div>
+        <div class="torder" id="torder"></div>
+      </div>
+      <div class="dsec">
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="homeWidLbl">Виджеты вкладки «Главная»</span></div>
+        <div class="torder" id="homeOrder"></div>
+      </div>
+      <div class="dsec">
+        <button class="b sm" id="customReset" style="width:100%" title="Вернуть положение, размер, приветствие и порядок к значениям по умолчанию">↺ <span id="resetAllLbl">Сбросить всё</span></button>
       </div>
     </div>
 
@@ -648,7 +713,18 @@
     tabNotes: { ru: 'Заметки', en: 'Notes' },
     tabDesignTitle: { ru: 'Дизайн', en: 'Design' },
     tabDesign: { ru: 'Дизайн', en: 'Design' },
-    shotTitle: { ru: 'Скриншот области (Win + Shift + S)', en: 'Area screenshot (Win + Shift + S)' },
+    shotTitle: { ru: 'Скриншот области (Ctrl+Alt+X)', en: 'Area screenshot (Ctrl+Alt+X)' },
+    tabCustomTitle: { ru: 'Кастомизация', en: 'Customization' },
+    tabCustom: { ru: 'Кастом', en: 'Custom' },
+    posLbl: { ru: 'Положение на экране', en: 'Screen position' },
+    posLeft: { ru: 'Слева', en: 'Left' }, posCenter: { ru: 'Центр', en: 'Center' }, posRight: { ru: 'Справа', en: 'Right' },
+    sizeLbl: { ru: 'Размер острова', en: 'Island size' },
+    greetLbl: { ru: 'Своё приветствие', en: 'Custom greeting' },
+    greetReset: { ru: 'Авто', en: 'Auto' },
+    greetPh: { ru: 'Напр.: Привет, босс! 👋', en: 'E.g.: Hey boss! 👋' },
+    orderLbl: { ru: 'Порядок вкладок', en: 'Tab order' },
+    homeWidLbl: { ru: 'Виджеты вкладки «Главная»', en: '"Home" tab widgets' },
+    resetAllLbl: { ru: 'Сбросить всё', en: 'Reset everything' },
     hideTitle: { ru: 'Скрыть остров (Ctrl+Alt+H)', en: 'Hide the island (Ctrl+Alt+H)' },
     quitTitle: { ru: 'Закрыть остров (Ctrl+Alt+Q)', en: 'Close the island (Ctrl+Alt+Q)' },
     tglTitle: { ru: 'Открыть Telegram', en: 'Open Telegram' },
@@ -887,6 +963,7 @@
   var CALL = { on: false, app: '', start: 0, who: '' };
   var NT = { on: false, app: '', call: false, timer: null };
   var over = false, pinned = false, popup = false, popTimer = null, dragging = false;
+  var islandDragShrink = false; // пока тащишь остров мышью (вкладка «Кастом») — сворачиваем его в маленький вид
   var T = { total: 25 * 60, left: 25 * 60, running: false, done: false, endAt: 0, doneAt: 0 };
   var S = { running: false, base: 0, startAt: 0, laps: [], lastLap: 0 };
   var F = { on: false, start: 0, apps: [], cur: '', sum: null };
@@ -923,6 +1000,14 @@
     var tabApps = document.querySelector('[data-tab="apps"]'); if (tabApps) { tabApps.title = t('tabAppsTitle'); var la = tabApps.querySelector('.lbl'); if (la) la.textContent = t('tabApps'); }
     setTtl('tabNotes', 'tabNotesTitle'); var ln = $('tabNotes') && $('tabNotes').querySelector('.lbl'); if (ln) ln.textContent = t('tabNotes');
     var tabDesign = document.querySelector('[data-tab="design"]'); if (tabDesign) { tabDesign.title = t('tabDesignTitle'); var lg = tabDesign.querySelector('.lbl'); if (lg) lg.textContent = t('tabDesign'); }
+    setTtl('tabCustom', 'tabCustomTitle'); var lc = $('tabCustom') && $('tabCustom').querySelector('.lbl'); if (lc) lc.textContent = t('tabCustom');
+    setTxt('posLbl', 'posLbl'); setTxt('sizeLbl', 'sizeLbl'); setTxt('greetLbl', 'greetLbl'); setTxt('orderLbl', 'orderLbl');
+    setTxt('homeWidLbl', 'homeWidLbl'); setTxt('resetAllLbl', 'resetAllLbl');
+    setTxt('greetReset', 'greetReset'); setPh('greetInput', 'greetPh');
+    var pl = document.querySelector('[data-pos="left"]'); if (pl) pl.textContent = t('posLeft');
+    var pc = document.querySelector('[data-pos="center"]'); if (pc) pc.textContent = t('posCenter');
+    var pr = document.querySelector('[data-pos="right"]'); if (pr) pr.textContent = t('posRight');
+    if (typeof TAB_LABEL === 'object') { TAB_LABEL.home = t('tabHome'); TAB_LABEL.timer = t('tabTimer'); TAB_LABEL.focus = t('tabFocus'); TAB_LABEL.day = t('tabDay'); TAB_LABEL.apps = t('tabApps'); TAB_LABEL.notes = t('tabNotes'); TAB_LABEL.design = t('tabDesign'); TAB_LABEL.custom = t('tabCustom'); if (typeof renderTorder === 'function') renderTorder(); }
     setTtl('shot', 'shotTitle');
     setTtl('hide', 'hideTitle');
     setTtl('quit', 'quitTitle');
@@ -997,6 +1082,7 @@
   renderLangSeg();
 
   function mode() {
+    if (islandDragShrink) return 'idle';
     if (NT.on) return 'notif';
     if (over || pinned || dragging || typing) return 'full';
     if (popup) return 'pop';
@@ -1205,7 +1291,7 @@
     if (t !== 'home' && t !== 'lock' && !LIC.pro) { showLock(''); return; }
     tab = t; island.dataset.tab = t;
     Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) { b.classList.toggle('sel', b.dataset.tab === t); });
-    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === t); });
+    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === t); });
     if (t !== 'day') dyReset();
     draw();
   }
@@ -1233,7 +1319,7 @@
   function showLock(msg) {
     tab = 'lock'; island.dataset.tab = 'lock';
     Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) { b.classList.remove('sel'); });
-    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === 'lock'); });
+    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === 'lock'); });
     $('lkTitle').textContent = LIC.pro ? t('licenseName') + LIC.name : (LIC.expired ? t('licenseExpired') : t('lockTitleDefault'));
     $('lkMsg').textContent = msg || '';
     dyReset(); draw();
@@ -1815,6 +1901,168 @@
   }).catch(function () { applyTheme(); renderDesign(); });
   applyTheme(); renderDesign();
 
+  /* ---------- Кастомизация: позиция, размер, своё приветствие, порядок вкладок ---------- */
+  var TAB_LABEL = { home: 'Главная', timer: 'Таймер', focus: 'Не беспокоить', day: 'Итоги', apps: 'Программы', notes: 'Заметки', design: 'Дизайн', custom: 'Кастом' };
+  var HOME_WIDGET_LABEL = { clock: 'Часы и погода', app: 'Текущее приложение', media: 'Плеер' };
+  var HOME_WIDGET_EL = { clock: 'hwClock', app: 'appc', media: 'hwMedia' };
+  var SIZE_SCALE = { small: 0.85, medium: 1, large: 1.15 };
+  var C = {
+    position: 'center', size: 'medium', greeting: '',
+    tabOrder: ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom'],
+    homeOrder: ['clock', 'app', 'media'], homeHidden: []
+  };
+  var cSaveTimer = null;
+  function saveC() { clearTimeout(cSaveTimer); cSaveTimer = setTimeout(function () { window.api.customSave(C); }, 300); }
+  function renderPosSeg() { qAll('[data-pos]').forEach(function (b) { b.classList.toggle('sel', b.dataset.pos === C.position); }); applyDock(); }
+  // «Пристыкован» к стене только при явном «Слева»/«Справа» — в режиме «Центр»/«Свободно» остров обычный.
+  function applyDock() {
+    if (C.position === 'left' || C.position === 'right') { island.dataset.dock = C.position; document.body.dataset.dock = C.position; }
+    else { delete island.dataset.dock; delete document.body.dataset.dock; }
+    try { draw(); } catch (e) {}
+  }
+  function renderSizeSeg() { qAll('[data-size]').forEach(function (b) { b.classList.toggle('sel', b.dataset.size === C.size); }); }
+  function applyScale() { document.documentElement.style.setProperty('--iscale', String(SIZE_SCALE[C.size] || 1)); }
+  function applyTabOrder() {
+    var wrap = document.querySelector('.tabs');
+    if (!wrap) return;
+    C.tabOrder.forEach(function (id) {
+      var el = wrap.querySelector('[data-tab="' + id + '"]');
+      if (el) wrap.appendChild(el);
+    });
+    var shotBtn = $('shot'); if (shotBtn) wrap.appendChild(shotBtn); // кнопка скриншота — всегда последней
+  }
+  function renderTorder() {
+    var wrap = $('torder'); if (!wrap) return;
+    wrap.innerHTML = '';
+    C.tabOrder.forEach(function (id, i) {
+      var row = document.createElement('div'); row.className = 'trow';
+      var lbl = document.createElement('span'); lbl.textContent = TAB_LABEL[id] || id; row.appendChild(lbl);
+      var btns = document.createElement('div'); btns.className = 'tbtns';
+      var up = document.createElement('button'); up.textContent = '↑'; up.disabled = i === 0;
+      up.addEventListener('click', function () { moveTab(i, -1); });
+      var dn = document.createElement('button'); dn.textContent = '↓'; dn.disabled = i === C.tabOrder.length - 1;
+      dn.addEventListener('click', function () { moveTab(i, 1); });
+      btns.appendChild(up); btns.appendChild(dn); row.appendChild(btns);
+      wrap.appendChild(row);
+    });
+  }
+  function moveTab(i, dir) {
+    var j = i + dir; if (j < 0 || j >= C.tabOrder.length) return;
+    var t0 = C.tabOrder[i]; C.tabOrder[i] = C.tabOrder[j]; C.tabOrder[j] = t0;
+    applyTabOrder(); renderTorder(); saveC();
+  }
+  // Порядок и видимость виджетов вкладки «Главная» (часы/приложение/плеер) — применяется через
+  // CSS order + класс cust-hidden, чтобы не конфликтовать с их собственной логикой показа/скрытия.
+  function applyHomeOrder() {
+    C.homeOrder.forEach(function (id, i) {
+      var elId = HOME_WIDGET_EL[id]; var el = elId && $(elId); if (!el) return;
+      el.style.order = String(i);
+      el.classList.toggle('cust-hidden', C.homeHidden.indexOf(id) >= 0);
+    });
+  }
+  function renderHomeOrder() {
+    var wrap = $('homeOrder'); if (!wrap) return;
+    wrap.innerHTML = '';
+    C.homeOrder.forEach(function (id, i) {
+      var hidden = C.homeHidden.indexOf(id) >= 0;
+      var row = document.createElement('div'); row.className = 'trow';
+      var lbl = document.createElement('span'); lbl.textContent = HOME_WIDGET_LABEL[id] || id;
+      if (hidden) lbl.style.opacity = '.5';
+      row.appendChild(lbl);
+      var btns = document.createElement('div'); btns.className = 'tbtns';
+      var eye = document.createElement('button'); eye.textContent = hidden ? '👁' : '🚫'; eye.title = hidden ? 'Показать' : 'Скрыть';
+      eye.addEventListener('click', function () { toggleHomeWidget(id); });
+      var up = document.createElement('button'); up.textContent = '↑'; up.disabled = i === 0;
+      up.addEventListener('click', function () { moveHomeWidget(i, -1); });
+      var dn = document.createElement('button'); dn.textContent = '↓'; dn.disabled = i === C.homeOrder.length - 1;
+      dn.addEventListener('click', function () { moveHomeWidget(i, 1); });
+      btns.appendChild(eye); btns.appendChild(up); btns.appendChild(dn); row.appendChild(btns);
+      wrap.appendChild(row);
+    });
+  }
+  function moveHomeWidget(i, dir) {
+    var j = i + dir; if (j < 0 || j >= C.homeOrder.length) return;
+    var t0 = C.homeOrder[i]; C.homeOrder[i] = C.homeOrder[j]; C.homeOrder[j] = t0;
+    applyHomeOrder(); renderHomeOrder(); saveC();
+  }
+  function toggleHomeWidget(id) {
+    var k = C.homeHidden.indexOf(id);
+    if (k >= 0) C.homeHidden.splice(k, 1); else C.homeHidden.push(id);
+    applyHomeOrder(); renderHomeOrder(); saveC();
+  }
+  qAll('[data-pos]').forEach(function (b) { b.addEventListener('click', function () {
+    C.position = b.dataset.pos;
+    if (C.position === 'left' || C.position === 'right') C.posY = null; // кнопкой — по центру стены по высоте
+    renderPosSeg(); saveC();
+  }); });
+  qAll('[data-size]').forEach(function (b) { b.addEventListener('click', function () { C.size = b.dataset.size; renderSizeSeg(); applyScale(); saveC(); }); });
+  if ($('greetInput')) $('greetInput').addEventListener('input', function () { C.greeting = $('greetInput').value.slice(0, 60); saveC(); });
+  if ($('greetReset')) $('greetReset').addEventListener('click', function () { C.greeting = ''; $('greetInput').value = ''; saveC(); });
+  function applyCFromServer(r) {
+    if (r) {
+      if (['center', 'left', 'right', 'custom'].indexOf(r.position) >= 0) C.position = r.position;
+      if (['small', 'medium', 'large'].indexOf(r.size) >= 0) C.size = r.size;
+      if (typeof r.greeting === 'string') C.greeting = r.greeting;
+      C.posX = typeof r.posX === 'number' ? r.posX : null;
+      C.posY = typeof r.posY === 'number' ? r.posY : null;
+      if (Array.isArray(r.tabOrder) && r.tabOrder.length) C.tabOrder = r.tabOrder.filter(function (id) { return TAB_LABEL.hasOwnProperty(id); });
+      if (Array.isArray(r.homeOrder) && r.homeOrder.length) C.homeOrder = r.homeOrder.filter(function (id) { return HOME_WIDGET_LABEL.hasOwnProperty(id); });
+      if (Array.isArray(r.homeHidden)) C.homeHidden = r.homeHidden.filter(function (id) { return HOME_WIDGET_LABEL.hasOwnProperty(id); });
+    }
+    renderPosSeg(); renderSizeSeg(); applyScale(); applyTabOrder(); renderTorder(); applyHomeOrder(); renderHomeOrder();
+    if ($('greetInput')) $('greetInput').value = C.greeting || '';
+  }
+  window.api.customLoad().then(applyCFromServer).catch(function () { renderPosSeg(); renderSizeSeg(); applyScale(); renderTorder(); applyHomeOrder(); renderHomeOrder(); });
+  if ($('customReset')) $('customReset').addEventListener('click', function () {
+    window.api.customReset().then(applyCFromServer).catch(function () {});
+  });
+
+  // Свободное перетаскивание острова мышью — можно схватить прямо саму «капсулу» на рабочем
+  // столе (в любом виде — свёрнутом или развёрнутом, кроме кликов по самим кнопкам/вкладкам/полям),
+  // а можно за ручку «Перетащи сюда» во вкладке «Кастом» — работает и так, и так одинаково.
+  // Порог в несколько пикселей отличает обычный клик по острову от настоящего перетаскивания.
+  // Во время перетаскивания остров сворачивается в маленький вид, а у края экрана — «прилипает» к стенке.
+  (function () {
+    var armed = false, active = false, startX = 0, startY = 0, lastX = 0, lastY = 0;
+    var THRESHOLD = 5;
+    function onDown(e) {
+      armed = true; active = false;
+      startX = e.screenX; startY = e.screenY; lastX = startX; lastY = startY;
+      e.preventDefault();
+    }
+    var row = $('dragRow');
+    if (row) row.addEventListener('mousedown', onDown);
+    island.addEventListener('mousedown', function (e) {
+      // Не мешаем обычным кликам по кнопкам, вкладкам и полям ввода внутри развёрнутого острова.
+      if (e.target.closest && e.target.closest('button, input, a, textarea, select, [contenteditable]')) return;
+      onDown(e);
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!armed) return;
+      if (!active) {
+        if (Math.abs(e.screenX - startX) < THRESHOLD && Math.abs(e.screenY - startY) < THRESHOLD) return;
+        active = true; pinned = true; islandDragShrink = true; syncMouse();
+        window.api.customDragStart(startX, startY); // окно реально уменьшается — иначе не долетит до краёв/низа экрана
+      }
+      var dx = e.screenX - lastX, dy = e.screenY - lastY;
+      lastX = e.screenX; lastY = e.screenY;
+      if (dx || dy) window.api.customDragMove(dx, dy).then(function (r) {
+        island.classList.toggle('snap-near', !!(r && r.near));
+      }).catch(function () {});
+    });
+    document.addEventListener('mouseup', function () {
+      if (!armed) return;
+      armed = false;
+      if (!active) return; // просто клик, без перетаскивания — ничего не трогаем
+      active = false; islandDragShrink = false; pinned = false; syncMouse();
+      island.classList.remove('snap-near');
+      window.api.customDragEnd().then(function (r) {
+        if (r) { C.position = r.position; C.posX = r.posX; C.posY = r.posY; }
+        renderPosSeg();
+      }).catch(function () {});
+    });
+  })();
+
   /* ---------- автозапуск и приветствие ---------- */
   function drawAuto(on) { $('auto').classList.toggle('on', !!on); $('auto').setAttribute('aria-checked', on ? 'true' : 'false'); }
   window.api.autostartGet().then(drawAuto).catch(function () {});
@@ -2005,6 +2253,14 @@
     pcv.hidden = !pcHas; if (pcHas) pcv.style.backgroundImage = 'url("' + M.cover + '")'; pcv.classList.toggle('has', pcHas);
     var md = mode();
     var music = M.ok && M.status === 'Playing' && !CALL.on;
+    // Вертикальная полоска у стены: часы столбиком, обложка и «эквалайзер», когда играет музыка.
+    var dnow = new Date();
+    $('dvH').textContent = String(dnow.getHours()).padStart(2, '0');
+    $('dvM').textContent = String(dnow.getMinutes()).padStart(2, '0');
+    $('dvEq').hidden = !music;
+    var dvHas = music && !!M.cover;
+    $('dvCv').hidden = !dvHas;
+    if (dvHas) $('dvCv').style.backgroundImage = 'url("' + M.cover + '")';
     var showT = T.running || T.done, showS = S.running, showF = F.on;
     $('mm').hidden = !music;
     var rem = remNow(), showR = !!rem;

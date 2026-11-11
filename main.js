@@ -1,4 +1,7 @@
-const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell, net, dialog, nativeImage, desktopCapturer, Tray, Menu, powerMonitor } = require('electron');
+const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell, net, dialog, nativeImage, desktopCapturer, Tray, Menu, powerMonitor, clipboard } = require('electron');
+// Экономия памяти: V8 в режиме «поменьше памяти» и без запасного процесса рендерера про запас.
+app.commandLine.appendSwitch('js-flags', '--optimize-for-size');
+app.commandLine.appendSwitch('disable-features', 'SpareRendererForSitePerProcess');
 const { spawn, execFile, execFileSync } = require('child_process');
 const path = require('path');
 const os = require('os');
@@ -12,7 +15,7 @@ const LIC = require('./license').create(app.getPath('userData'));
 const VERIFY_URL = 'https://proud-morning-91a0.korzyy52.workers.dev/verify';
 
 const W = 440;
-const H = 500; // высоты окна хватает с запасом под самую высокую вкладку (Дизайн, 480px) — иначе низ панели обрезается
+const H = 540; // высоты окна хватает с запасом под самую высокую вкладку (Кастом, ~500px) — иначе низ панели обрезается
 // Данные (заметки, настройки, лог) храним в папке профиля пользователя — при установке
 // файлы программы лежат в Program Files, куда без прав администратора нельзя писать.
 const DATA_DIR = app.getPath('userData');
@@ -77,7 +80,8 @@ const STR = {
     trayQuit: 'Выход', trayTooltip: 'Island for Windows — клик: показать или скрыть',
     pickAppTitle: 'Выбери приложение или ярлык', pickAppFilter: 'Приложения и ярлыки', allFiles: 'Все файлы',
     pickImageTitle: 'Выбери фото для фона острова', imagesFilter: 'Изображения',
-    pickSoundTitle: 'Выбери звук для уведомлений', audioFilter: 'Аудио'
+    pickSoundTitle: 'Выбери звук для уведомлений', audioFilter: 'Аудио',
+    shotSaveTitle: 'Сохранить скриншот', pngFilter: 'Изображение PNG', shotCopied: 'Скриншот скопирован — вставляй Ctrl+V', shotSaved: 'Скриншот сохранён'
   },
   en: {
     fullscreen: 'fullscreen', browser: 'browser', manually: 'manually',
@@ -90,7 +94,8 @@ const STR = {
     trayQuit: 'Quit', trayTooltip: 'Island for Windows — click: show or hide',
     pickAppTitle: 'Choose an app or shortcut', pickAppFilter: 'Apps and shortcuts', allFiles: 'All files',
     pickImageTitle: 'Choose a photo for the island background', imagesFilter: 'Images',
-    pickSoundTitle: 'Choose a notification sound', audioFilter: 'Audio'
+    pickSoundTitle: 'Choose a notification sound', audioFilter: 'Audio',
+    shotSaveTitle: 'Save screenshot', pngFilter: 'PNG image', shotCopied: 'Screenshot copied — paste with Ctrl+V', shotSaved: 'Screenshot saved'
   }
 };
 function L(key) { return (STR[LANG] && STR[LANG][key]) || STR.ru[key] || key; }
@@ -503,6 +508,126 @@ ipcMain.handle('design-image', async () => {
 });
 ipcMain.handle('design-image-clear', () => { try { fs.unlinkSync(BG_FILE); } catch (e) {} return true; });
 
+// ---- Кастомизация (позиция и размер острова, своё приветствие, порядок вкладок) ----
+const CUSTOM_FILE = dataPath('custom.json');
+const TABS_ALL = ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom'];
+// Виджеты внутри вкладки «Главная» — единственная вкладка с несколькими независимыми блоками,
+// поэтому именно для неё даём порядок/видимость (остальные вкладки — один сплошной экран).
+const HOME_WIDGETS_ALL = ['clock', 'app', 'media'];
+// Масштаб (small/medium/large): окно физически меняет размер (а не только CSS-transform --iscale
+// в рендерере), иначе увеличенный остров обрезался бы границами окна.
+const SIZE_SCALE = { small: 0.85, medium: 1, large: 1.15 };
+function cleanCustom(d) {
+  d = d || {};
+  const position = ['center', 'left', 'right', 'custom'].indexOf(d.position) >= 0 ? d.position : 'center';
+  const size = ['small', 'medium', 'large'].indexOf(d.size) >= 0 ? d.size : 'medium';
+  const greeting = String(d.greeting || '').slice(0, 60);
+  const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v) : null);
+  let order = Array.isArray(d.tabOrder) ? d.tabOrder.filter((x) => TABS_ALL.indexOf(x) >= 0) : [];
+  order = order.filter((x, i) => order.indexOf(x) === i); // без дублей, первое вхождение побеждает
+  TABS_ALL.forEach((x) => { if (order.indexOf(x) === -1) order.push(x); }); // недостающие — в конец
+  let homeOrder = Array.isArray(d.homeOrder) ? d.homeOrder.filter((x) => HOME_WIDGETS_ALL.indexOf(x) >= 0) : [];
+  homeOrder = homeOrder.filter((x, i) => homeOrder.indexOf(x) === i);
+  HOME_WIDGETS_ALL.forEach((x) => { if (homeOrder.indexOf(x) === -1) homeOrder.push(x); });
+  const homeHidden = Array.isArray(d.homeHidden) ? d.homeHidden.filter((x) => HOME_WIDGETS_ALL.indexOf(x) >= 0) : [];
+  return { position, size, greeting, posX: num(d.posX), posY: num(d.posY), tabOrder: order, homeOrder, homeHidden };
+}
+let customSettings = cleanCustom((() => { try { return JSON.parse(fs.readFileSync(CUSTOM_FILE, 'utf8')); } catch (e) { return null; } })());
+// Реальные пиксельные размеры окна под выбранный пресет размера — считаются от базовых W×H,
+// поэтому «L» не обрезается собственной рамкой окна при любом разрешении экрана.
+function islandDims(size) {
+  const s = SIZE_SCALE[size] || 1;
+  return { w: Math.round(W * s), h: Math.round(H * s) };
+}
+// Позиция + размер окна под текущие настройки, всегда прижаты к границам ТЕКУЩЕГО экрана —
+// работает одинаково на любом разрешении/мониторе и пересчитывается заново при каждом вызове.
+function computeIslandBounds(b, cs) {
+  const dims = islandDims(cs.size);
+  const clampX = (x) => Math.max(b.x, Math.min(b.x + b.width - dims.w, x));
+  const clampY = (y) => Math.max(b.y, Math.min(b.y + b.height - dims.h, y));
+  let x, y;
+  if (cs.position === 'custom' && cs.posX !== null && cs.posY !== null) {
+    x = clampX(cs.posX); y = clampY(cs.posY);
+  } else if (cs.position === 'left' || cs.position === 'right') {
+    // Вплотную к боковой стене, на той высоте, где отпустили (по умолчанию — середина экрана).
+    x = cs.position === 'left' ? b.x : b.x + b.width - dims.w;
+    y = cs.posY !== null ? clampY(cs.posY) : clampY(Math.round(b.y + (b.height - dims.h) / 2));
+  }
+  else { x = Math.round(b.x + (b.width - dims.w) / 2); y = b.y; }
+  return { x, y, width: dims.w, height: dims.h };
+}
+function applyCustomBounds() {
+  if (!win || win.isDestroyed()) return;
+  const bounds = computeIslandBounds(screen.getPrimaryDisplay().bounds, customSettings);
+  win.setBounds(bounds);
+  log('applyCustomBounds position=' + customSettings.position + ' -> ' + JSON.stringify(bounds));
+}
+ipcMain.handle('custom-load', () => customSettings);
+ipcMain.handle('custom-save', (_e, d) => {
+  customSettings = cleanCustom(d);
+  try { fs.writeFileSync(CUSTOM_FILE, JSON.stringify(customSettings, null, 1)); } catch (e) { log('custom save error: ' + e.message); }
+  applyCustomBounds();
+  return customSettings;
+});
+// «Сбросить всё» — возвращает положение/размер/приветствие/порядок вкладок и виджетов к значениям по умолчанию.
+ipcMain.handle('custom-reset', () => {
+  customSettings = cleanCustom(null);
+  try { fs.writeFileSync(CUSTOM_FILE, JSON.stringify(customSettings, null, 1)); } catch (e) { log('custom save error: ' + e.message); }
+  applyCustomBounds();
+  return customSettings;
+});
+// Свободное перетаскивание мышью из вкладки «Кастом»: рендерер шлёт дельту движения курсора,
+// мы двигаем окно в реальном времени, прижимая его к границам текущего экрана.
+// ВАЖНО: окно физически (а не только визуально) сжимается на время перетаскивания —
+// иначе его настоящие большие границы (как у развёрнутого острова) не долетают до
+// краёв/низа экрана, и magnet-прилипание к стенке работает ненадёжно.
+const DRAG_W = 130, DRAG_H = 40; // физический размер окна во время перетаскивания, px
+// Зона «прилипания» у края экрана — доля ширины экрана, а не фикс. пиксели: на любом разрешении
+// отпустить острова «примерно у края» (а не прямо впритык до пикселя) должно хватать, чтобы прилип.
+function dockSnapPx(screenWidth) { return Math.max(130, Math.min(220, Math.round(screenWidth * 0.08))); }
+ipcMain.on('custom-drag-start', (_e, sx, sy) => {
+  if (!win || win.isDestroyed()) return;
+  const b = screen.getPrimaryDisplay().bounds;
+  let x = Math.round((typeof sx === 'number' ? sx : b.x) - DRAG_W / 2);
+  let y = Math.round((typeof sy === 'number' ? sy : b.y) - DRAG_H / 2);
+  x = Math.max(b.x, Math.min(b.x + b.width - DRAG_W, x));
+  y = Math.max(b.y, Math.min(b.y + b.height - DRAG_H, y));
+  win.setBounds({ x, y, width: DRAG_W, height: DRAG_H });
+  log('drag-start sx=' + sx + ' sy=' + sy + ' -> win=' + JSON.stringify({ x, y }) + ' screen=' + JSON.stringify(b));
+});
+// handle (не on) — рендереру нужен ответ: близко ли сейчас к краю, чтобы показать подсветку
+// «вот-вот прилипнет» прямо во время перетаскивания, а не только после отпускания.
+ipcMain.handle('custom-drag-move', (_e, dx, dy) => {
+  if (!win || win.isDestroyed()) return null;
+  const b = screen.getPrimaryDisplay().bounds, wb = win.getBounds();
+  const nx = Math.max(b.x, Math.min(b.x + b.width - wb.width, wb.x + dx));
+  const ny = Math.max(b.y, Math.min(b.y + b.height - wb.height, wb.y + dy));
+  win.setPosition(nx, ny);
+  const snap = dockSnapPx(b.width);
+  let near = null;
+  if (nx - b.x <= snap) near = 'left';
+  else if ((b.x + b.width) - (nx + wb.width) <= snap) near = 'right';
+  return { near };
+});
+ipcMain.handle('custom-drag-end', () => {
+  if (win && !win.isDestroyed()) {
+    const b = screen.getPrimaryDisplay().bounds, wb = win.getBounds();
+    const SNAP = dockSnapPx(b.width); // «магнитная» зона у края экрана — та же, что подсвечивалась во время перетаскивания
+    let position = 'custom';
+    if (wb.x - b.x <= SNAP) position = 'left';
+    else if ((b.x + b.width) - (wb.x + wb.width) <= SNAP) position = 'right';
+    log('drag-end wb=' + JSON.stringify(wb) + ' screen=' + JSON.stringify(b) + ' snap=' + SNAP + ' -> position=' + position);
+    // У стены: ставим окно так, чтобы середина вертикальной полоски (top 36px, высота 200px) оказалась там, где отпустили.
+    const posY = position === 'custom' ? wb.y : Math.round(wb.y + wb.height / 2 - 136);
+    customSettings = cleanCustom(Object.assign({}, customSettings, { position, posX: wb.x, posY }));
+    try { fs.writeFileSync(CUSTOM_FILE, JSON.stringify(customSettings, null, 1)); } catch (e) { log('custom save error: ' + e.message); }
+    applyCustomBounds(); // возвращаем окно к настоящему размеру острова в итоговой (возможно прилипшей) позиции
+  }
+  return customSettings;
+});
+// Смена разрешения, подключение/отключение монитора и т.п. — остров не должен улетать за экран.
+try { screen.on('display-metrics-changed', () => applyCustomBounds()); } catch (e) {}
+
 // ---- Стекло с блюром: снимаем экран позади острова и размываем в окне ----
 // Само окно на время снимка скрывается от захвата, чтобы остров не попал в собственный фон.
 let blurOn = false, blurBusy = false, blurLast = 0, blurTimer = null;
@@ -515,14 +640,18 @@ async function captureBlur(force) {
     const d = screen.getPrimaryDisplay(), b = d.bounds;
     win.setContentProtection(true);
     await sleep(90);
-    const tw = Math.round(b.width * d.scaleFactor * 0.5), th = Math.round(b.height * d.scaleFactor * 0.5);
+    const tw = Math.round(b.width * d.scaleFactor * 0.25), th = Math.round(b.height * d.scaleFactor * 0.25); // всё равно размывается — четверти разрешения хватает
     const srcs = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: tw, height: th } });
     win.setContentProtection(false);
     const src = srcs.find((s) => String(s.display_id) === String(d.id)) || srcs[0];
     if (!src) return;
     const img = src.thumbnail, ts = img.getSize();
     const f = ts.width / b.width;
-    const crop = img.crop({ x: Math.max(0, Math.round((b.width - W) / 2 * f)), y: 0, width: Math.min(ts.width, Math.round(W * f)), height: Math.min(ts.height, Math.round(H * f)) });
+    const wb = win.getBounds(); // реальные текущие границы окна — остров можно двигать/изменять
+    const crop = img.crop({
+      x: Math.max(0, Math.round((wb.x - b.x) * f)), y: Math.max(0, Math.round((wb.y - b.y) * f)),
+      width: Math.min(ts.width, Math.round(wb.width * f)), height: Math.min(ts.height, Math.round(wb.height * f))
+    });
     if (win && !win.isDestroyed()) win.webContents.send('blur-bg', crop.toJPEG(72).toString('base64'));
   } catch (e) { log('blur capture error: ' + e.message); }
   finally { try { if (win && !win.isDestroyed()) win.setContentProtection(false); } catch (e) {} blurBusy = false; }
@@ -546,6 +675,7 @@ function autoSet(on) {
   catch (e) { log('autostart error: ' + e.message); }
 }
 function greetingText() {
+  if (customSettings.greeting) return customSettings.greeting;
   const h = new Date().getHours();
   let g, e;
   if (h >= 5 && h < 12) { g = L('morning'); e = '☀️'; }
@@ -569,7 +699,7 @@ function trayMenu() {
     { label: visible ? L('trayHide') : L('trayShow'), accelerator: 'Ctrl+Alt+H', click: toggleIsland },
     { label: L('trayAutoHide'), type: 'checkbox', checked: autoHide, click: (it) => setAutoHide(it.checked) },
     { label: L('trayDnd'), accelerator: 'Ctrl+Alt+F', click: () => { if (!visible) { override = 'show'; applyVisibility(true); } win && win.webContents.send('focus'); } },
-    { label: L('trayShot'), click: () => takeScreenshot() },
+    { label: L('trayShot'), accelerator: 'Ctrl+Alt+X', click: () => openScreenshotTool() },
     { type: 'separator' },
     { label: L('trayAutostart'), type: 'checkbox', checked: autoGet(), click: (it) => autoSet(it.checked) },
     { type: 'separator' },
@@ -631,31 +761,66 @@ async function getWeather() {
   }
 }
 
-// ---- Скриншот области (то же, что Win + Shift + S) ----
+// ---- Свой скриншотер: выделение области экрана + рисование поверх + «Сохранить как» ----
 let shotUntil = 0;
-let shotTimer = null;
-function takeScreenshot() {
-  if (process.platform !== 'win32' || !win || win.isDestroyed()) return;
+let shotWin = null;
+let shotImage = ''; // data:image/png;base64,... — полноразмерный снимок экрана, только пока открыт редактор
+let shotDoneHint = '';
+let shotLastDir = '';
+function restoreAfterShot() {
+  shotUntil = 0;
+  shotImage = ''; // снимок экрана (несколько МБ) больше не нужен — отдаём память
+  log('screenshot: restore');
+  applyVisibility(false);
+  if (shotDoneHint && visible && win && !win.isDestroyed()) win.webContents.send('vis', { visible: true, hint: shotDoneHint, hintMs: 2200 });
+  shotDoneHint = '';
+}
+async function openScreenshotTool() {
+  if (process.platform !== 'win32' || shotWin) return;
   log('screenshot: start');
   statsRoll(); stats.shots++;
-  shotUntil = Date.now() + 20000;
-  visible = false;
-  clearTimeout(hideTimer);
-  win.webContents.send('vis', { visible: false, hint: '', hintMs: 0 });
-  setTimeout(() => {
-    shell.openExternal('ms-screenclip:').then(() => log('screenshot: overlay launched')).catch((e) => log('screenclip error: ' + e.message));
-  }, 400);
-  clearTimeout(shotTimer);
-  shotTimer = setTimeout(() => { shotUntil = 0; log('screenshot: restore'); applyVisibility(false); }, 20500);
+  try {
+    const d = screen.getPrimaryDisplay(), b = d.bounds;
+    // Остров не прячем с анимацией (это было +0.4 c ожидания) — просто исключаем его окно из захвата.
+    if (win && !win.isDestroyed()) win.setContentProtection(true);
+    await sleep(60);
+    const tw = Math.round(b.width * d.scaleFactor), th = Math.round(b.height * d.scaleFactor);
+    const srcs = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: tw, height: th } });
+    if (win && !win.isDestroyed()) win.setContentProtection(false);
+    const src = srcs.find((s) => String(s.display_id) === String(d.id)) || srcs[0];
+    if (!src) return;
+    shotImage = 'data:image/png;base64,' + src.thumbnail.toPNG().toString('base64');
+    // Пока открыт редактор, остров убираем мгновенно, чтобы не висел поверх выделения.
+    shotUntil = Date.now() + 10 * 60 * 1000;
+    visible = false;
+    clearTimeout(hideTimer);
+    if (win && !win.isDestroyed()) { win.webContents.send('vis', { visible: false, hint: '', hintMs: 0 }); win.hide(); }
+    shotWin = new BrowserWindow({
+      x: b.x, y: b.y, width: b.width, height: b.height,
+      frame: false, transparent: false, resizable: false, movable: false, hasShadow: false,
+      alwaysOnTop: true, skipTaskbar: true, fullscreenable: false, show: false, backgroundColor: '#111318',
+      webPreferences: { preload: path.join(__dirname, 'shot-preload.js'), contextIsolation: true, nodeIntegration: false, spellcheck: false }
+    });
+    shotWin.setAlwaysOnTop(true, 'screen-saver');
+    shotWin.setVisibleOnAllWorkspaces(true);
+    shotWin.once('ready-to-show', () => { shotWin && !shotWin.isDestroyed() && (shotWin.show(), shotWin.focus()); });
+    shotWin.on('closed', () => { shotWin = null; restoreAfterShot(); });
+    shotWin.loadFile('shot.html', { query: { lang: LANG } });
+  } catch (e) {
+    log('screenshot error: ' + e.message);
+    try { if (win && !win.isDestroyed()) win.setContentProtection(false); } catch (x) {}
+    shotWin = null; restoreAfterShot();
+  }
 }
 
 function createWindow() {
   const b = screen.getPrimaryDisplay().bounds;
+  const pos0 = computeIslandBounds(b, customSettings);
   win = new BrowserWindow({
-    width: W,
-    height: H,
-    x: Math.round(b.x + (b.width - W) / 2),
-    y: b.y,
+    width: pos0.width,
+    height: pos0.height,
+    x: pos0.x,
+    y: pos0.y,
     frame: false,
     transparent: true,
     resizable: false,
@@ -668,7 +833,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      spellcheck: false
     }
   });
   win.setAlwaysOnTop(true, 'screen-saver');
@@ -689,7 +855,8 @@ function startMedia() {
   ps = spawn('powershell.exe', [
     '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', resPath('media.ps1'),
-    '-CmdFile', CMD_FILE
+    '-CmdFile', CMD_FILE,
+    '-ParentPid', String(process.pid)
   ], { windowsHide: true });
 
   let buf = '';
@@ -730,7 +897,7 @@ let nps = null;
 function startNotif() {
   if (process.platform !== 'win32' || !notifOn || nps) return;
   try {
-    nps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', resPath('notif.ps1')], { windowsHide: true });
+    nps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', resPath('notif.ps1'), '-ParentPid', String(process.pid)], { windowsHide: true });
     let buf = '';
     nps.stdout.setEncoding('utf8');
     nps.stdout.on('data', (chunk) => {
@@ -763,6 +930,19 @@ function setNotif(on) {
   if (notifOn) startNotif(); else stopNotif();
 }
 
+// Если прошлый остров закрылся аварийно (или его сняли в диспетчере задач), его PowerShell-мосты
+// могли остаться висеть в памяти. Закрываем только наши скрипты и только не от текущего процесса.
+function killOrphanBridges() {
+  if (process.platform !== 'win32') return;
+  const cmd = "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.CommandLine -match 'media\\.ps1|notif\\.ps1' -and $_.ParentProcessId -ne " + process.pid + " } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $_.ProcessId }";
+  execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', cmd], { windowsHide: true, timeout: 15000 }, (err, out) => {
+    const n = String(out || '').trim().split(/\s+/).filter(Boolean).length;
+    if (n) log('killed orphan bridges: ' + n);
+  });
+}
+// Раз в несколько минут просим окно острова сбросить кэши картинок (обложки, фон блюра и т.п.).
+setInterval(() => { if (win && !win.isDestroyed()) win.webContents.send('mem-trim'); }, 5 * 60 * 1000);
+
 function stopMedia() {
   if (ps) { try { ps.kill(); } catch (e) {} ps = null; }
   try { fs.unlinkSync(CMD_FILE); } catch (e) {}
@@ -770,6 +950,7 @@ function stopMedia() {
 
 app.whenReady().then(async () => {
   if (!gotLock) return;
+  log('=== Island for Windows started, version ' + app.getVersion() + ' ===');
   // Первый запуск (ключа lang ещё нет в settings.json): спрашиваем язык интерфейса —
   // это замена шагу выбора языка в установщике, которого у нас нет (запуск через start.bat).
   if (!langChosen) {
@@ -781,6 +962,7 @@ app.whenReady().then(async () => {
       setLang(r && r.response === 1 ? 'en' : 'ru');
     } catch (e) { setLang('ru'); }
   }
+  killOrphanBridges();
   createWindow();
   // После разблокировки компьютера остров возвращается на экран и здоровается.
   try {
@@ -984,7 +1166,39 @@ app.whenReady().then(async () => {
   // и смена языка «на лету» из вкладки «Дизайн» без перезапуска.
   ipcMain.on('lang-get-sync', (e) => { e.returnValue = LANG; });
   ipcMain.handle('lang-set', (_e, l) => setLang(l));
-  ipcMain.on('screenshot', () => takeScreenshot());
+  ipcMain.on('screenshot', () => openScreenshotTool());
+  ipcMain.handle('shot-get', () => shotImage);
+  ipcMain.on('shot-cancel', () => { if (shotWin && !shotWin.isDestroyed()) shotWin.close(); });
+  ipcMain.handle('shot-save', async (_e, dataUrl) => {
+    if (!shotWin || shotWin.isDestroyed()) return { ok: false };
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const name = `Screenshot_${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}.png`;
+    let r;
+    try {
+      r = await dialog.showSaveDialog(shotWin, { title: L('shotSaveTitle'), defaultPath: path.join(shotLastDir || app.getPath('pictures'), name), filters: [{ name: L('pngFilter'), extensions: ['png'] }] });
+    } catch (e) { log('shot save dialog error: ' + e.message); return { ok: false }; }
+    if (!r || r.canceled || !r.filePath) return { ok: false, canceled: true };
+    try {
+      const b64 = String(dataUrl || '').split(',')[1] || '';
+      fs.writeFileSync(r.filePath, Buffer.from(b64, 'base64'));
+    } catch (e) { log('shot write error: ' + e.message); return { ok: false }; }
+    shotLastDir = path.dirname(r.filePath); // в следующий раз диалог откроется в этой же папке
+    try { clipboard.writeImage(nativeImage.createFromDataURL(dataUrl)); } catch (e) {} // и сразу в буфер — удобно
+    shotDoneHint = L('shotSaved');
+    if (shotWin && !shotWin.isDestroyed()) shotWin.close();
+    return { ok: true, path: r.filePath };
+  });
+  ipcMain.handle('shot-copy', (_e, dataUrl) => {
+    try {
+      const img = nativeImage.createFromDataURL(String(dataUrl || ''));
+      if (img.isEmpty()) return { ok: false };
+      clipboard.writeImage(img);
+    } catch (e) { log('shot copy error: ' + e.message); return { ok: false }; }
+    shotDoneHint = L('shotCopied');
+    if (shotWin && !shotWin.isDestroyed()) shotWin.close();
+    return { ok: true };
+  });
   ipcMain.on('hide', () => { override = 'hide'; applyVisibility(true); });
   ipcMain.on('quit', () => app.quit());
 
@@ -1000,6 +1214,9 @@ app.whenReady().then(async () => {
   });
   globalShortcut.register('Control+Alt+T', () => win && win.webContents.send('timer'));
   globalShortcut.register('Control+Alt+Q', () => app.quit());
+  try { globalShortcut.register('Control+Alt+X', () => openScreenshotTool()); } catch (e) {} // скриншот области
+  // Диагностика: открыть консоль разработчика острова (посмотреть ошибки в консоли при багах).
+  globalShortcut.register('Control+Alt+D', () => { if (win && !win.isDestroyed()) win.webContents.toggleDevTools(); });
 });
 
 app.on('before-quit', () => { usageSave(); statsSave(); log('before-quit'); });

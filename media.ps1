@@ -1,4 +1,4 @@
-param([string]$CmdFile)
+param([string]$CmdFile, [int]$ParentPid = 0)
 
 # Bridge to Windows system media sessions (SMTC).
 # Browsers, Yandex Music, Spotify and other players expose controls through it.
@@ -146,6 +146,7 @@ $thumbKey = ''
 $thumbTries = 0
 $lastErr = ''
 
+$memTick = 0
 while ($true) {
   try {
     if (Test-Path -LiteralPath $CmdFile) {
@@ -245,5 +246,11 @@ while ($true) {
     if ($em -ne $lastErr) { Log ('loop ERROR: ' + $em); $lastErr = $em }
   }
   try { Check-Foreground } catch { }
+  # Раз в ~10 c: если остров закрылся/упал — выходим сами (не висим в памяти); и чистим свою память.
+  $memTick++
+  if ($memTick % 25 -eq 0) {
+    if ($ParentPid -gt 0 -and -not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { exit }
+    [System.GC]::Collect()
+  }
   Start-Sleep -Milliseconds 400
 }

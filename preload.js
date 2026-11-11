@@ -1,4 +1,8 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
+
+// Периодическая уборка памяти: сбрасываем кэш картинок движка (обложки, фон блюра) — они
+// всё равно подгрузятся заново, если понадобятся.
+ipcRenderer.on('mem-trim', () => { try { webFrame.clearCache(); } catch (e) {} });
 
 contextBridge.exposeInMainWorld('api', {
   hover: (over) => ipcRenderer.send('hover', !!over),
@@ -40,6 +44,12 @@ contextBridge.exposeInMainWorld('api', {
   designSave: (d) => ipcRenderer.invoke('design-save', d),
   designImage: () => ipcRenderer.invoke('design-image'),
   designImageClear: () => ipcRenderer.invoke('design-image-clear'),
+  customLoad: () => ipcRenderer.invoke('custom-load'),
+  customSave: (d) => ipcRenderer.invoke('custom-save', d),
+  customDragStart: (sx, sy) => ipcRenderer.send('custom-drag-start', sx, sy),
+  customDragMove: (dx, dy) => ipcRenderer.invoke('custom-drag-move', dx, dy),
+  customDragEnd: () => ipcRenderer.invoke('custom-drag-end'),
+  customReset: () => ipcRenderer.invoke('custom-reset'),
   blurActive: (on) => ipcRenderer.send('blur-active', !!on),
   onBlurBg: (cb) => ipcRenderer.on('blur-bg', (_e, d) => cb(d)),
   onGreet: (cb) => ipcRenderer.on('greet', (_e, t) => cb(t)),

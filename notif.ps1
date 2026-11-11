@@ -1,6 +1,7 @@
 ﻿param(
   [string]$Db = "$env:LOCALAPPDATA\Microsoft\Windows\Notifications\wpndatabase.db",
-  [string]$Filter = 'discord|telegram'
+  [string]$Filter = 'discord|telegram',
+  [int]$ParentPid = 0
 )
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -129,6 +130,7 @@ function Get-Avatar($x) {
 $last = -1
 $seen = @{}
 $failed = 0
+$memTick = 0
 
 while ($true) {
   try {
@@ -174,5 +176,11 @@ while ($true) {
       }
     } finally { [WSQ]::Close($h) }
   } catch { Diag ('error: ' + $_.Exception.Message); Start-Sleep -Seconds 5 }
+  # Раз в ~30 c: остров закрылся/упал — выходим; плюс чистим свою память.
+  $memTick++
+  if ($memTick % 25 -eq 0) {
+    if ($ParentPid -gt 0 -and -not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { exit }
+    [System.GC]::Collect()
+  }
   Start-Sleep -Milliseconds 1200
 }

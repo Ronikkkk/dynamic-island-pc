@@ -666,9 +666,27 @@ function setBlurActive(on) {
 const AUTO_FLAG = dataPath('autostart-init.json');
 // В собранном .exe двойной клик по иконке и так запускает именно его, аргументы не нужны;
 // при запуске из исходников (npm start) Electron нужно указать, какую папку открывать.
-function autoArgs() { return app.isPackaged ? [] : [app.getAppPath()]; }
+// Путь берём в кавычки: Electron записывает аргументы автозапуска в реестр как есть, и путь с пробелом
+// («Мои проекты») обрезался — при входе в Windows выскакивало «Unable to find Electron app at C:\\Users\\…\\Мои».
+function autoArgs() { return app.isPackaged ? [] : ['"' + app.getAppPath() + '"']; }
+function legacyAutoArgs() { return app.isPackaged ? [] : [app.getAppPath()]; } // старая запись — без кавычек
 function autoGet() {
-  try { return !!app.getLoginItemSettings({ path: process.execPath, args: autoArgs() }).openAtLogin; } catch (e) { return false; }
+  try {
+    return !!app.getLoginItemSettings({ path: process.execPath, args: autoArgs() }).openAtLogin ||
+      !!app.getLoginItemSettings({ path: process.execPath, args: legacyAutoArgs() }).openAtLogin;
+  } catch (e) { return false; }
+}
+// Если автозапуск был включён старой версией (путь без кавычек) — перезаписываем правильно.
+function fixLegacyAutostart() {
+  if (app.isPackaged || process.platform !== 'win32') return;
+  try {
+    const legacy = !!app.getLoginItemSettings({ path: process.execPath, args: legacyAutoArgs() }).openAtLogin;
+    const ok = !!app.getLoginItemSettings({ path: process.execPath, args: autoArgs() }).openAtLogin;
+    if (legacy && !ok && app.getAppPath().indexOf(' ') >= 0) {
+      app.setLoginItemSettings({ openAtLogin: true, path: process.execPath, args: autoArgs() });
+      log('autostart: fixed unquoted path');
+    }
+  } catch (e) { log('autostart fix error: ' + e.message); }
 }
 function autoSet(on) {
   try { app.setLoginItemSettings({ openAtLogin: !!on, path: process.execPath, args: autoArgs() }); }
@@ -963,6 +981,7 @@ app.whenReady().then(async () => {
     } catch (e) { setLang('ru'); }
   }
   killOrphanBridges();
+  fixLegacyAutostart();
   createWindow();
   // После разблокировки компьютера остров возвращается на экран и здоровается.
   try {

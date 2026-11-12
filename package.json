@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis --x64",
-    "dist:store": "electron-builder --win appx --x64"
+    "dist:store": "electron-builder --win appx --x64 -c.directories.output=dist-store"
   },
   "devDependencies": {
     "electron": "^33.2.0",

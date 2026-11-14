@@ -1,6 +1,6 @@
 {
   "name": "dynamic-island-pc",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "Остров для рабочего стола Windows",
   "main": "main.js",
   "scripts": {

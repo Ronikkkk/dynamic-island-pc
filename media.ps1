@@ -25,6 +25,20 @@ $propType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMedi
 $strType = [Windows.Storage.Streams.IRandomAccessStreamWithContentType]
 $mgr = Await ($mgrType::RequestAsync()) $mgrType
 
+# Запасной способ управления: виртуальные медиаклавиши (как кнопки на клавиатуре).
+# Нужен, когда плеер отключает кнопки в системном управлении Windows
+# (например, некоторые версии Яндекс Музыки или «Моя волна») — сама клавиша при этом работает.
+try {
+  Add-Type -Namespace IslandMedia -Name Keys -MemberDefinition '[DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);'
+} catch { }
+function Send-MediaKey([byte]$vk) {
+  try {
+    [IslandMedia.Keys]::keybd_event($vk, 0, 1, [UIntPtr]::Zero)   # нажатие (extended key)
+    [IslandMedia.Keys]::keybd_event($vk, 0, 3, [UIntPtr]::Zero)   # отпускание
+  } catch { }
+}
+$VK_NEXT = 0xB0; $VK_PREV = 0xB1; $VK_PLAY = 0xB3
+
 # Diagnostic log next to this script (media.log).
 $LogFile = Join-Path $PSScriptRoot 'media.log'
 function Log($m) {
@@ -153,10 +167,24 @@ while ($true) {
       $cmd = (Get-Content -LiteralPath $CmdFile -Raw).Trim()
       Remove-Item -LiteralPath $CmdFile -Force -ErrorAction SilentlyContinue
       $cs = Pick-Session
+      if (-not $cs -and ($cmd -eq 'toggle' -or $cmd -eq 'next' -or $cmd -eq 'prev')) {
+        # Системного плеера не видно — пробуем медиаклавишей.
+        if ($cmd -eq 'next') { Send-MediaKey $VK_NEXT } elseif ($cmd -eq 'prev') { Send-MediaKey $VK_PREV } else { Send-MediaKey $VK_PLAY }
+        Log ('cmd ' + $cmd + ': no session, media key')
+      }
       if ($cs) {
-        if ($cmd -eq 'toggle') { $null = Await ($cs.TryTogglePlayPauseAsync()) ([bool]) }
-        elseif ($cmd -eq 'next') { $null = Await ($cs.TrySkipNextAsync()) ([bool]) }
-        elseif ($cmd -eq 'prev') { $null = Await ($cs.TrySkipPreviousAsync()) ([bool]) }
+        if ($cmd -eq 'toggle') {
+          $ok = $false; try { $ok = [bool](Await ($cs.TryTogglePlayPauseAsync()) ([bool])) } catch { }
+          if (-not $ok) { Send-MediaKey $VK_PLAY; Log ('cmd toggle refused by ' + $cs.SourceAppUserModelId + ', media key') }
+        }
+        elseif ($cmd -eq 'next') {
+          $ok = $false; try { $ok = [bool](Await ($cs.TrySkipNextAsync()) ([bool])) } catch { }
+          if (-not $ok) { Send-MediaKey $VK_NEXT; Log ('cmd next refused by ' + $cs.SourceAppUserModelId + ', media key') }
+        }
+        elseif ($cmd -eq 'prev') {
+          $ok = $false; try { $ok = [bool](Await ($cs.TrySkipPreviousAsync()) ([bool])) } catch { }
+          if (-not $ok) { Send-MediaKey $VK_PREV; Log ('cmd prev refused by ' + $cs.SourceAppUserModelId + ', media key') }
+        }
         elseif ($cmd -eq 'shuffle') {
           $cur = $cs.GetPlaybackInfo().IsShuffleActive
           $want = -not [bool]$cur

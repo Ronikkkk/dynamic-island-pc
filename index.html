@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <title>Island for Windows</title>
 <style>
+  /* Полосы прокрутки везде одинаковые: прозрачная дорожка, тонкий полупрозрачный ползунок без стрелок. */
+  ::-webkit-scrollbar { width: 5px; height: 5px; background: transparent; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--txt, #fff) 20%, transparent); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--txt, #fff) 38%, transparent); }
+  ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
   html, body { margin: 0; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; color: var(--txt); user-select: none; }
   button { font-family: inherit; }
   #island {
@@ -23,14 +29,101 @@
   #hint.on { opacity: 1; transform: translateX(-50%) translateY(0); }
   #hint kbd { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12px; color: #fc0; }
   #island[data-mode="pop"]  { width: 280px; }
-  #island[data-mode="full"] { width: 400px; height: 274px; border-radius: 34px; }
+  #island[data-mode="full"] { width: 424px; height: 274px; border-radius: 34px; }
   #island[data-mode="notif"] { width: 400px; height: var(--nth, 100px); border-radius: 30px; }
-  #island[data-mode="full"][data-tab="design"] { height: 480px; }
+  #island[data-mode="full"][data-tab="design"] { height: 528px; }
+  #p-design { gap: 7px; overflow-y: auto; padding-right: 8px; margin-right: -8px; }
   #island[data-mode="full"][data-tab="home"] { height: 352px; }
   #island[data-mode="full"][data-tab="notes"] { height: 312px; }
   #island[data-mode="full"][data-tab="day"] { height: 384px; }
-  #island[data-mode="full"][data-tab="custom"] { height: 560px; }
-  #p-custom { overflow-y: auto; padding-right: 2px; }
+  #island[data-mode="full"][data-tab="custom"] { height: 528px; }
+  #p-custom { gap: 7px; }
+  #p-custom .dsec { gap: 5px; }
+  #p-custom .trow { padding-top: 3px; padding-bottom: 3px; }
+  #dragRow { padding: 6px 10px !important; }
+  #island[data-mode="full"][data-tab="game"] { height: 452px; }
+  #island[data-mode="full"][data-tab="fx"] { height: 470px; }
+  /* Кружок загрузки из браузера возле часов */
+  .dlr { width: 16px; height: 16px; flex: none; display: inline-flex; margin-left: 2px; }
+  .dlr svg { width: 16px; height: 16px; overflow: visible; }
+  .dlr circle { fill: none; stroke-width: 2.2; }
+  .dlr .bg { stroke: color-mix(in srgb, var(--txt) 20%, transparent); }
+  .dlr .fg { stroke: #4ea1ff; stroke-linecap: round; stroke-dasharray: 13 34; transform-origin: 10px 10px; animation: dlspin 1s linear infinite; }
+  .dlr path { fill: none; stroke: var(--txt); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .dlr .ok { display: none; stroke: #34d27b; stroke-width: 2; }
+  .dlr.done .fg { stroke: #34d27b; stroke-dasharray: none; animation: none; }
+  .dlr.done .ar { display: none; } .dlr.done .ok { display: block; }
+  @keyframes dlspin { to { transform: rotate(360deg); } }
+  .dlsz { font-size: 11px; opacity: .7; margin-left: 2px; }
+  /* Эффекты внутри острова: трава по верхнему краю и волна под музыку внизу — под контентом острова */
+  #fxc { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; display: block; }
+  #fxc[hidden] { display: none; }
+  /* Эффекты экрана */
+  #p-fx { gap: 8px; }
+  .fxhead { display: flex; align-items: center; gap: 10px; flex: none; }
+  .fxhead b { font-size: 14px; }
+  .fxcard { display: flex; flex-direction: column; gap: 7px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--txt) 7%, transparent); flex: none; transition: opacity .2s; }
+  .fxcard.off > :not(.fxrow) { opacity: .4; }
+  .fxrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .fxt { font-size: 13px; font-weight: 700; }
+  .fxchips { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+  .fxchip { width: 24px; height: 24px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); flex: none; }
+  .fxchip.sel { box-shadow: 0 0 0 2px var(--ibg, #000), 0 0 0 4px var(--txt); }
+  .fxchips input[type=color] { width: 24px; height: 24px; border: 0; padding: 0; border-radius: 50%; background: none; cursor: pointer; flex: none; }
+  .fxchips input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+  .fxchips input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+  .fxchips input[type=color].sel { box-shadow: 0 0 0 2px var(--ibg, #000), 0 0 0 4px var(--txt); }
+  .fxcard .drow { justify-content: space-between; }
+  .fxcard .dseg button { padding-left: 9px; padding-right: 9px; }
+  .fxcard input[type=range].rg { width: 92px; }
+  #fxOpen { width: 100%; justify-content: space-between; display: flex; align-items: center; flex: none; padding: 7px 12px; border-radius: 12px; background: linear-gradient(90deg, rgba(60,200,90,.28), rgba(80,120,255,.28)); }
+
+  /* ---------- Режим игры: компактная полоска с FPS, нагрузкой и временем в игре ---------- */
+  #island[data-mode="game"] { width: 368px; }
+  #island[data-mode="game"] .game { opacity: 1; transition: opacity .25s .15s; }
+  .game { align-items: center; justify-content: center; gap: 11px; padding: 0 16px; color: var(--txt); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  .game .gfps, .game .gst { display: flex; align-items: baseline; gap: 3px; }
+  .game .gfps b { font-family: Consolas, "Cascadia Mono", monospace; font-size: 16px; font-variant-numeric: tabular-nums; min-width: 24px; text-align: right; }
+  .game .gst b { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .game i { font-style: normal; font-size: 9.5px; opacity: .6; letter-spacing: .04em; }
+  .game .gst b.hot { color: #ff9d3b; }
+  .game .gfps.hi b { color: #34d27b; } .game .gfps.mid b { color: #ffcc33; } .game .gfps.lo b { color: #ff4d4d; }
+  .game .gsep { width: 1px; height: 14px; background: color-mix(in srgb, currentColor 25%, transparent); flex: none; }
+  .game .gtime { display: flex; align-items: center; gap: 4px; }
+  .game .gtime svg { width: 12px; height: 12px; opacity: .8; }
+  /* «Красный»: остров прозрачный, остаётся только красный текст с тёмной обводкой (читается на любой картинке игры). */
+  #island[data-mode="game"][data-gskin="red"] { background: transparent !important; box-shadow: none !important; }
+  #island[data-mode="game"][data-gskin="red"]::before, #island[data-mode="game"][data-gskin="red"]::after,
+  #island[data-mode="game"][data-gskin="neon"]::before, #island[data-mode="game"][data-gskin="neon"]::after { opacity: 0 !important; }
+  #island[data-gskin="red"] .game { color: #ff2b2b; text-shadow: 0 0 2px #000, 0 0 3px #000, 0 1px 6px rgba(0,0,0,.9); }
+  #island[data-gskin="red"] .game .gfps b, #island[data-gskin="red"] .game .gst b.hot { color: #ff2b2b; }
+  #island[data-gskin="red"] .game i { opacity: .85; }
+  #island[data-gskin="red"] .game .gsep { background: rgba(255,43,43,.5); box-shadow: 0 0 2px #000; }
+  /* «Неон»: тёмное стекло с бирюзовым свечением. */
+  #island[data-mode="game"][data-gskin="neon"] { background: rgba(8,10,20,.74) !important; box-shadow: 0 0 0 1px rgba(0,255,214,.55), 0 0 18px rgba(0,255,214,.32), inset 0 0 12px rgba(0,255,214,.12) !important; }
+  #island[data-gskin="neon"] .game { color: #6ffbe8; text-shadow: 0 0 6px rgba(0,255,214,.65); }
+  #island[data-gskin="neon"] .game .gfps.hi b { color: #a6ff6b; text-shadow: 0 0 8px rgba(166,255,107,.8); }
+  /* Вкладка «Игра» */
+  #p-game { overflow-y: auto; padding-right: 8px; margin-right: -8px; gap: 9px; }
+  .gmhero { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 14px; border-radius: 16px; flex: none;
+    background: linear-gradient(135deg, rgba(255,43,43,.26), rgba(120,40,255,.22)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--txt) 10%, transparent); }
+  .gmhero b { display: block; font-size: 14.5px; margin-bottom: 2px; }
+  .gmhero span { display: block; font-size: 11px; opacity: .75; line-height: 1.3; }
+  .gmhero .sw2.on { background: #ff3b3b; }
+  .gskins { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .gskins button { border: 0; border-radius: 12px; padding: 7px 6px 6px; background: color-mix(in srgb, var(--txt) 8%, transparent); color: var(--txt); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
+  .gskins button:hover { background: color-mix(in srgb, var(--txt) 14%, transparent); }
+  .gskins button.sel { box-shadow: 0 0 0 2px #ff3b3b; }
+  .gprev { width: 100%; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font: 700 11px Consolas, "Cascadia Mono", monospace; }
+  .gprev.red { background: repeating-conic-gradient(#454a59 0 25%, #2c303b 0 50%) 0 0 / 10px 10px; color: #ff2b2b; text-shadow: 0 0 2px #000, 0 0 3px #000; }
+  .gprev.def { background: var(--ibg, #000); color: var(--txt); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--txt) 15%, transparent); }
+  .gprev.neon { background: rgba(8,10,20,.92); color: #6ffbe8; box-shadow: 0 0 0 1px rgba(0,255,214,.6), 0 0 10px rgba(0,255,214,.35); text-shadow: 0 0 6px rgba(0,255,214,.8); }
+  .gmnow { padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--txt) 7%, transparent); font-size: 11.5px; line-height: 1.35; flex: none; }
+  .gmnow b { font-weight: 700; }
+  .gmtoday { display: flex; flex-direction: column; gap: 3px; max-height: 96px; overflow-y: auto; padding-right: 6px; margin-right: -6px; }
+  .gmnote { display: flex; gap: 6px; align-items: flex-start; font-size: 10.5px; opacity: .6; line-height: 1.35; flex: none; }
+  .gmnote::before { content: "i"; flex: none; width: 13px; height: 13px; border-radius: 50%; border: 1px solid currentColor; font: 700 9px/13px "Segoe UI", sans-serif; text-align: center; margin-top: 1px; }
+  #p-custom { overflow-y: auto; padding-right: 8px; margin-right: -8px; }
   #p-home [data-widget].cust-hidden { display: none !important; }
   /* Стыковка к стене (положение «Слева»/«Справа»): остров вплотную к краю экрана,
      а в свёрнутом виде — маленький флажок-ручка, за который его можно снова открыть. */
@@ -54,13 +147,25 @@
   .dveq i:nth-child(2) { animation-delay: .2s; } .dveq i:nth-child(3) { animation-delay: .4s; }
   @keyframes dveq { 0%, 100% { height: 4px; } 50% { height: 14px; } }
   body[data-dock] #hint { display: none; }
+  /* «Снизу» — на панели задач: остров стоит в полоске панели и раскрывается вверх. */
+  #island[data-bottom] { top: auto; bottom: 7px; transform-origin: bottom center; }
+  #island[data-bottom].gone { transform: translateX(-50%) translateY(70px) scale(var(--iscale, 1)); }
+  body[data-bottom] #hint { top: auto; bottom: 50px; transform: translateX(-50%) translateY(12px); }
+  body[data-bottom] #hint.on { transform: translateX(-50%) translateY(0); }
+  #island[data-bottom][data-mode="idle"], #island[data-bottom][data-mode="multi"], #island[data-bottom][data-mode="pop"], #island[data-bottom][data-mode="game"] { box-shadow: 0 2px 10px rgba(0,0,0,.35); }
   /* Подсветка во время перетаскивания — «вот-вот прилипнет», видна прямо на маленьком острове,
      пока его тащишь к краю, чтобы было понятно где отпустить, а не на глаз угадывать. */
   #island.snap-near { box-shadow: 0 0 0 3px #4ea1ff, 0 8px 24px rgba(0,0,0,.35); }
   #dragRow { padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, var(--txt) 9%, transparent); user-select: none; }
   #dragRow:active { background: color-mix(in srgb, var(--txt) 16%, transparent); }
   .dgrip { font-size: 13px; letter-spacing: -2px; opacity: .6; }
-  .torder { max-height: 148px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
+  .torder { display: flex; flex-direction: column; gap: 3px; flex: none; }
+  /* Порядок вкладок — сеткой в 2 колонки (читается слева направо, сверху вниз), без вложенной прокрутки. */
+  #torder { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  #torder .trow { padding: 4px 6px 4px 9px; }
+  #torder .trow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  #torder .trow .num { opacity: .45; font-size: 10.5px; margin-right: 5px; flex: none; }
+  #torder .trow .tl { display: flex; align-items: center; min-width: 0; }
   .trow { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; border-radius: 10px; background: color-mix(in srgb, var(--txt) 7%, transparent); font-size: 12px; }
   .trow .tbtns { display: flex; gap: 3px; }
   .trow button { width: 20px; height: 20px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--txt) 14%, transparent); color: var(--txt); cursor: pointer; font-size: 11px; line-height: 1; }
@@ -101,8 +206,10 @@
 
   /* свёрнутая музыка */
   .multi { align-items: center; gap: 12px; padding: 0 14px; box-sizing: border-box; font-size: 13px; font-weight: 600; white-space: nowrap; }
-  .multi .mm { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-  .multi .mt { min-width: 70px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .multi .mm { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; overflow: hidden; }
+  .multi .mm .eq { flex: none; }
+  #island.mtight .multi .mt { display: none; }
+  .multi .mt { min-width: 20px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .chip { display: flex; align-items: center; gap: 5px; flex: none; padding-left: 12px; border-left: 1px solid color-mix(in srgb, var(--txt) 16%, transparent); }
   .multi .mm + .chip, .multi > .chip:first-child { }
   .ci { width: 14px; height: 14px; flex: none; display: inline-block; vertical-align: -2px; color: var(--txt); }
@@ -131,8 +238,13 @@
   .tab.live::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--txt); }
   .tab svg { width: 14px; height: 14px; flex: none; }
   .tab:not(.sel) .lbl { display: none; }
-  .tab:not(.sel) { padding: 0 7px; }
-  .tab.sel { padding: 0 9px; }
+  .tab:not(.sel) { padding: 0 4.5px; }
+  .tab.sel { padding: 0 7px; }
+  .tab.sel .lbl { font-size: 11.5px; }
+  .head .xs { display: flex; align-items: center; gap: 3px; }
+  .x.xshot { opacity: .6; display: flex; align-items: center; justify-content: center; }
+  .x.xshot svg { width: 13px; height: 13px; }
+  .x.xshot:hover { opacity: 1; }
   .head .xs { flex: none; margin-left: 6px; }
   .tab.act { color: var(--txt); }
   .xs { display: flex; gap: 12px; align-items: center; height: 16px; }
@@ -182,11 +294,8 @@
   .fphead button { border: 0; background: color-mix(in srgb, var(--txt) 16%, transparent); cursor: pointer; font-size: 12.5px; font-weight: 600; line-height: 1; padding: 6px 12px; transition: transform .12s; color: var(--txt); border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
   .fplist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
   .fprow { display: flex; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 12px; cursor: pointer; flex: none; }
-  .fplist { padding-right: 4px; scrollbar-width: thin; }
-  .fplist::-webkit-scrollbar { width: 6px; }
-  .fplist::-webkit-scrollbar-track { background: color-mix(in srgb, var(--txt) 12%, transparent); border-radius: 3px; }
-  .fplist::-webkit-scrollbar-thumb { background: var(--txt); border-radius: 3px; }
-  .fplist::-webkit-scrollbar-button { display: none; height: 0; }
+  .fplist { padding-right: 6px; }
+
   .fphead button:hover { transform: scale(1.05); }
   .fprow:hover { background: color-mix(in srgb, var(--txt) 10%, transparent); }
   .vrow { display: flex; align-items: center; gap: 10px; font-size: 12px; opacity: .85; padding: 0 2px; }
@@ -354,7 +463,7 @@
   .gp.arm .gx { opacity: 1; color: #d33; font-weight: 700; }
   .gp.gadd { background: none; border: 1px dashed color-mix(in srgb, var(--txt) 30%, transparent); font-weight: 500; opacity: .8; }
   .gin { height: 26px; width: 120px; box-sizing: border-box; padding: 0 12px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--txt) 20%, transparent); color: var(--txt); font: 600 12.5px "Segoe UI", sans-serif; outline: none; flex: none; }
-  .agrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px 8px; flex: 1; min-height: 0; overflow-y: auto; align-content: start; padding-right: 2px; }
+  .agrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px 8px; flex: 1; min-height: 0; overflow-y: auto; align-content: start; padding-right: 6px; }
   .agrid::-webkit-scrollbar { width: 4px; }
   .agrid::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--txt) 25%, transparent); border-radius: 2px; }
   .tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 68px; padding: 6px 2px 0; border: 0; border-radius: 12px; background: none; color: var(--txt); cursor: pointer; box-sizing: border-box; }
@@ -379,7 +488,7 @@
   .rq:hover { background: color-mix(in srgb, var(--txt) 20%, transparent); }
   .rq.sel { background: var(--txt); color: var(--inv); }
   .ndt { height: 28px; box-sizing: border-box; padding: 0 10px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--txt) 14%, transparent); color: var(--txt); font: 12.5px "Segoe UI", sans-serif; outline: none; color-scheme: dark; flex: none; }
-  .nlist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
+  .nlist { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 6px; }
   .nlist::-webkit-scrollbar { width: 4px; }
   .nlist::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--txt) 25%, transparent); border-radius: 2px; }
   .nt { display: flex; align-items: center; gap: 9px; min-height: 30px; padding: 0 8px; border-radius: 10px; background: color-mix(in srgb, var(--txt) 6%, transparent); flex: none; }
@@ -444,11 +553,12 @@
 <body>
 <div id="hint"></div>
 <div id="island" data-mode="idle" data-tab="home">
-  <div class="layer idle"><span class="mono" id="ic">00:00</span></div>
+  <canvas id="fxc"></canvas>
+  <div class="layer idle"><span class="mono" id="ic">00:00</span><span class="dlr" id="dlr1" hidden><svg viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fg" cx="10" cy="10" r="7.5"/><path class="ar" d="M10 6.3v6.2M7.4 10 10 12.6 12.6 10"/><path class="ok" d="M6.6 10.2l2.3 2.3 4.6-4.9"/></svg></span></div>
   <div class="layer dockv"><div class="dvcv" id="dvCv" hidden></div><span class="mono" id="dvH">00</span><span class="mono" id="dvM">00</span><div class="dveq" id="dvEq" hidden><i></i><i></i><i></i></div></div>
   <div class="layer multi">
     <div class="mm" id="mm"><div class="cv sm" id="cvs"></div><span class="mt" id="mc2">Музыка</span><span class="eq"><i></i><i></i><i></i><i></i></span></div>
-    <div class="chip" id="cclk"><span class="mono" id="icm">00:00</span></div>
+    <div class="chip" id="cclk"><span class="mono" id="icm">00:00</span><span class="dlr" id="dlr2" hidden><svg viewBox="0 0 20 20"><circle class="bg" cx="10" cy="10" r="7.5"/><circle class="fg" cx="10" cy="10" r="7.5"/><path class="ar" d="M10 6.3v6.2M7.4 10 10 12.6 12.6 10"/><path class="ok" d="M6.6 10.2l2.3 2.3 4.6-4.9"/></svg></span><span class="mono dlsz" id="dlsz" hidden></span></div>
     <div class="chip warn" id="ct"><svg class="ci" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 8V4.6"/></svg><span class="mono" id="tc">25:00</span></div>
     <div class="chip" id="cs"><svg class="ci" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="9" r="5"/><path d="M8 9V6.2M6.2 1.8h3.6"/></svg><span class="mono" id="csv">00:00</span></div>
     <div class="chip" id="cr" style="color:var(--txt)"><svg class="ci" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11.5h9l-1.2-1.6V7a3.3 3.3 0 0 0-6.6 0v2.9zM6.6 13.4h2.8"/></svg><span class="mono" id="crv">30 мин</span></div>
@@ -456,6 +566,15 @@
     <div class="chip vio" id="cf"><svg class="ci" viewBox="0 0 16 16"><path fill="currentColor" d="M13.5 10.2A6 6 0 0 1 5.8 2.5a6 6 0 1 0 7.7 7.7z"/></svg><span class="mono" id="fcs">00:00</span></div>
   </div>
   <div class="layer pop"><div class="cv sm" id="pcv" hidden></div><span id="pt"></span></div>
+  <div class="layer game" id="gml">
+    <span class="gfps na" id="gFpsBox"><b id="gFps">—</b><i>FPS</i></span>
+    <span class="gsep"></span>
+    <span class="gst"><i>CPU</i><b id="gCpu">0%</b></span>
+    <span class="gst"><i>GPU</i><b id="gGpu">—</b></span>
+    <span class="gst"><i>RAM</i><b id="gRam">0%</b></span>
+    <span class="gsep"></span>
+    <span class="gtime"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="8" cy="8.5" r="5.5"/><path d="M8 8.5V5.6M8 8.5l2 1.3"/></svg><b class="mono" id="gTime">0:00</b></span>
+  </div>
   <div class="layer ntl" id="ntl">
     <div class="nth"><span><span class="nic" id="ntIc"></span><span class="nappb" id="ntBadge"></span><span id="ntApp"></span></span><button class="x" id="ntX" title="Закрыть">✕</button></div>
     <div class="nttl"><img class="ntav" id="ntAv" alt=""><span id="ntTitle"></span></div>
@@ -473,11 +592,11 @@
         <button class="tab" data-tab="day" id="tabDay" title="Итоги дня"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13.5V8.5M8 13.5V3M13 13.5V6.5"/></svg><span class="lbl">Итоги</span></button>
         <button class="tab" data-tab="apps" title="Программы"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5" rx="1.4"/><rect x="9" y="2" width="5" height="5" rx="1.4"/><rect x="2" y="9" width="5" height="5" rx="1.4"/><rect x="9" y="9" width="5" height="5" rx="1.4"/></svg><span class="lbl">Программы</span></button>
         <button class="tab" data-tab="notes" id="tabNotes" title="Заметки и напоминания"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h10v11H3zM5.5 6h5M5.5 8.8h5M5.5 11.3h3"/></svg><span class="lbl">Заметки</span></button>
+        <button class="tab" data-tab="game" id="tabGame" title="Режим игры"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 4.5h6.8a3.3 3.3 0 0 1 3.2 4l-.6 2.7a1.6 1.6 0 0 1-2.8.6L10 10.3H6l-1.2 1.5a1.6 1.6 0 0 1-2.8-.6l-.6-2.7a3.3 3.3 0 0 1 3.2-4z"/><path d="M5 6.8v2M4 7.8h2"/><circle cx="10.6" cy="7.2" r=".55" fill="currentColor"/><circle cx="11.9" cy="8.5" r=".55" fill="currentColor"/></svg><span class="lbl">Игра</span></button>
         <button class="tab" data-tab="design" title="Дизайн"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8c-3.6 0-6.2 2.6-6.2 5.7 0 2.5 2 3.6 3.6 3.6h1c.7 0 1.1.6.8 1.2-.4.9.2 1.9 1.3 1.9 3.3 0 5.7-2.7 5.7-6 0-3.8-2.8-6.4-6.2-6.4z"/><circle cx="5" cy="6.2" r=".6" fill="currentColor"/><circle cx="8" cy="4.8" r=".6" fill="currentColor"/><circle cx="11" cy="6.2" r=".6" fill="currentColor"/></svg><span class="lbl">Дизайн</span></button>
         <button class="tab" data-tab="custom" id="tabCustom" title="Кастомизация"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h7M2 8h4M2 12h7"/><circle cx="11.5" cy="4" r="1.6" fill="currentColor" stroke="none"/><circle cx="7.5" cy="8" r="1.6" fill="currentColor" stroke="none"/><circle cx="11.5" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg><span class="lbl">Кастом</span></button>
-        <button class="tab" id="shot" title="Скриншот области (Win + Shift + S)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4.5 1.5v9a1 1 0 0 0 1 1h9M1.5 4.5h9a1 1 0 0 1 1 1v9"/></svg></button>
       </div>
-      <div class="xs"><button class="x" id="hide" title="Скрыть остров (Ctrl+Alt+H)">–</button><button class="x" id="quit" title="Закрыть остров (Ctrl+Alt+Q)">✕</button></div>
+      <div class="xs"><button class="x xshot" id="shot" title="Скриншот области (Win + Shift + S)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4.5 1.5v9a1 1 0 0 0 1 1h9M1.5 4.5h9a1 1 0 0 1 1 1v9"/></svg></button><button class="x" id="hide" title="Скрыть остров (Ctrl+Alt+H)">–</button><button class="x" id="quit" title="Закрыть остров (Ctrl+Alt+Q)">✕</button></div>
     </div>
 
     <!-- Главная: время, погода, музыка -->
@@ -567,6 +686,25 @@
       <div class="agrid" id="agrid"></div>
     </div>
 
+    <!-- Режим игры -->
+    <div class="pane" id="p-game">
+      <div class="gmhero">
+        <div><b id="gmTitle">Режим игры</b><span id="gmSub">FPS, нагрузка ПК и время в игре — прямо в острове</span></div>
+        <button class="sw2" id="gmSw" role="switch" aria-checked="false" title="Включить режим игры"></button>
+      </div>
+      <div class="dsec">
+        <span class="dl" id="gmSkinLbl">Дизайн в игре</span>
+        <div class="gskins" id="gskins">
+          <button data-gs="red"><span class="gprev red">144 FPS</span><span id="gsRed">Красный</span></button>
+          <button data-gs="default"><span class="gprev def">144 FPS</span><span id="gsDef">Обычный</span></button>
+          <button data-gs="neon"><span class="gprev neon">144 FPS</span><span id="gsNeon">Неон</span></button>
+        </div>
+      </div>
+      <div class="gmnow" id="gmNow"></div>
+      <div class="dsec"><span class="dl" id="gmTodayLbl">Сегодня в играх</span><div class="gmtoday" id="gmToday"></div></div>
+      <div class="gmnote" id="gmNote">FPS — через RivaTuner (идёт с MSI Afterburner). В настройках игры выбери «Окно без рамки», иначе остров не виден поверх.</div>
+    </div>
+
     <!-- Дизайн -->
     <div class="pane" id="p-design">
       <div class="dsec"><span class="dl" id="presetsLbl">Готовые темы</span><div class="dsw" id="dsw"></div></div>
@@ -588,7 +726,9 @@
       <div class="drow" style="justify-content:space-between"><span class="dl" id="homeInfoLbl">Блок на главной</span><div class="dseg" id="iseg"><button data-info="pc" title="Нагрузка процессора и памяти">ПК</button><button data-info="rem" title="Ближайшее напоминание">Дела</button><button data-info="time" title="Время за компьютером сегодня">Время</button><button data-info="weather" title="Погода (нужен интернет)">Погода</button></div></div>
       <div class="drow" style="justify-content:space-between"><span class="dl" id="autostartLbl">Запускать вместе с Windows</span><button class="sw2" id="auto" role="switch" aria-checked="false" title="Автозапуск"></button></div>
       <div class="drow" style="justify-content:space-between"><span class="dl" id="autohideLbl">Автоскрытие (браузер, полный экран)</span><button class="sw2 on" id="ahide" role="switch" aria-checked="true" title="Прятать остров в браузере и полноэкранных окнах"></button></div>
+      <div class="drow" style="justify-content:space-between"><span class="dl" id="gahideLbl">Автоскрытие в играх</span><button class="sw2 on" id="gahide" role="switch" aria-checked="true" title="Прятать остров, когда запущена игра"></button></div>
       <div class="drow" style="justify-content:space-between"><span class="dl" id="notifLbl">Сообщения Discord/Telegram в острове</span><button class="sw2" id="ntf" role="switch" aria-checked="false" title="Показывать уведомления о сообщениях в острове"></button></div>
+      <button class="b sm" id="fxOpen"><span>🌿 <span id="fxOpenLbl">Эффекты острова: трава и волна под музыку</span></span><span>›</span></button>
       <div class="drow" style="justify-content:space-between"><span class="dl" id="langLbl">Язык</span><div class="dseg" id="langseg"><button data-lang="ru">RU</button><button data-lang="en">EN</button></div></div>
       <div class="dsec">
         <div class="drow" style="justify-content:space-between">
@@ -603,27 +743,57 @@
       </div>
     </div>
 
+    <!-- Эффекты экрана -->
+    <div class="pane" id="p-fx">
+      <div class="fxhead"><button class="b sm" id="fxBack">‹ <span id="fxBackLbl">Дизайн</span></button><b id="fxTitle">Эффекты острова</b></div>
+      <div class="fxcard" id="fxGrassCard">
+        <div class="fxrow"><span class="fxt">🌿 <span id="fxGrassLbl">Трава по верху острова</span></span><button class="sw2" id="fxGrassSw" role="switch" aria-checked="false"></button></div>
+        <div class="fxchips">
+          <button class="fxchip" data-gc="green" title="Зелёная" style="background:linear-gradient(135deg,#1f6b25,#7fd04a)"></button>
+          <button class="fxchip" data-gc="autumn" title="Осень" style="background:linear-gradient(135deg,#a3360f,#f2b134)"></button>
+          <button class="fxchip" data-gc="sakura" title="Сакура" style="background:linear-gradient(135deg,#e2709b,#ffd0e2)"></button>
+          <button class="fxchip" data-gc="ice" title="Лёд" style="background:linear-gradient(135deg,#3c9fc2,#d5f7ff)"></button>
+          <button class="fxchip" data-gc="neon" title="Неон-радуга" style="background:conic-gradient(#f33,#fd3,#3f6,#3cf,#a3f,#f33)"></button>
+          <input type="color" id="fxGrassCustom" title="Свой цвет">
+        </div>
+        <div class="drow"><span class="dl" id="fxWindLbl">Ветер</span><div class="dseg" id="fxWind"><button data-wind="calm">Штиль</button><button data-wind="breeze">Ветерок</button><button data-wind="storm">Буря</button></div></div>
+        <div class="drow"><span class="dl" id="fxDensLbl">Густота</span><div class="dseg" id="fxDens"><button data-dens="low">Редкая</button><button data-dens="mid">Средняя</button><button data-dens="high">Густая</button></div></div>
+        <div class="drow"><label class="dr" id="fxGrassHLbl">Высота <input type="range" class="rg" id="fxGrassH" min="20" max="90"></label><span class="dr"><span id="fxMusLbl">Под музыку</span><button class="sw2" id="fxGrassMus" role="switch" aria-checked="false"></button></span></div>
+      </div>
+      <div class="fxcard" id="fxWaveCard">
+        <div class="fxrow"><span class="fxt">🌊 <span id="fxWaveLbl">Волна внизу острова</span></span><button class="sw2" id="fxWaveSw" role="switch" aria-checked="false"></button></div>
+        <div class="drow"><span class="dl" id="fxStyleLbl">Вид</span><div class="dseg" id="fxStyle"><button data-ws="wave">Волна</button><button data-ws="line">Линия</button><button data-ws="bars">Столбики</button></div></div>
+        <div class="fxchips">
+          <button class="fxchip" data-wp="neon" title="Неон" style="background:linear-gradient(135deg,#19e3ff,#a23bff)"></button>
+          <button class="fxchip" data-wp="rainbow" title="Радуга" style="background:conic-gradient(#f33,#fd3,#3f6,#3cf,#a3f,#f33)"></button>
+          <button class="fxchip" data-wp="fire" title="Огонь" style="background:linear-gradient(135deg,#ff2a00,#ffd000)"></button>
+          <button class="fxchip" data-wp="ocean" title="Океан" style="background:linear-gradient(135deg,#0a4bff,#14e0c8)"></button>
+          <button class="fxchip" data-wp="white" title="Белая" style="background:#f4f4f6"></button>
+          <input type="color" id="fxWaveCustom" title="Свой цвет">
+        </div>
+        <div class="drow"><label class="dr" id="fxWaveHLbl">Высота <input type="range" class="rg" id="fxWaveH" min="30" max="160"></label><label class="dr" id="fxSensLbl">Чувствит. <input type="range" class="rg" id="fxSens" min="0" max="100"></label></div>
+      </div>
+      <div class="gmnote" id="fxNote">Волна двигается в такт звуку компьютера — ничего не записывается.</div>
+    </div>
+
     <!-- Кастомизация -->
     <div class="pane" id="p-custom">
       <div class="dsec">
-        <div class="drow" style="justify-content:space-between"><span class="dl" id="posLbl">Положение на экране</span><div class="dseg" id="posseg"><button data-pos="left">Слева</button><button data-pos="center">Центр</button><button data-pos="right">Справа</button></div></div>
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="posLbl">Положение</span><div class="dseg" id="posseg"><button data-pos="left">Слева</button><button data-pos="center">Центр</button><button data-pos="right">Справа</button><button data-pos="bottom" title="На панели задач — раскрывается вверх">Снизу</button></div></div>
         <div class="drow" id="dragRow" style="gap:8px;cursor:move"><span class="dgrip">⠿⠿</span><span class="dl" id="dragLbl" style="opacity:.8">Перетащи сюда, чтобы поставить остров куда хочешь</span></div>
         <div class="drow" style="justify-content:space-between"><span class="dl" id="sizeLbl">Размер острова</span><div class="dseg" id="sizeseg"><button data-size="small">S</button><button data-size="medium">M</button><button data-size="large">L</button></div></div>
       </div>
       <div class="dsec">
-        <div class="drow" style="justify-content:space-between"><span class="dl" id="greetLbl">Своё приветствие</span><button class="b sm" id="greetReset">Авто</button></div>
-        <div class="drow"><input type="text" id="greetInput" maxlength="60" placeholder="Напр.: Привет, босс! 👋" style="flex:1;background:color-mix(in srgb, var(--txt) 9%, transparent);border:0;border-radius:10px;padding:7px 10px;color:var(--txt);font-size:12.5px"></div>
+        <span class="dl" id="greetLbl">Своё приветствие</span>
+        <div class="drow"><input type="text" id="greetInput" maxlength="60" placeholder="Напр.: Привет, босс! 👋" style="flex:1;min-width:0;background:color-mix(in srgb, var(--txt) 9%, transparent);border:0;border-radius:10px;padding:7px 10px;color:var(--txt);font-size:12.5px"><button class="b sm" id="greetReset">Авто</button></div>
       </div>
       <div class="dsec">
         <div class="drow" style="justify-content:space-between"><span class="dl" id="orderLbl">Порядок вкладок</span></div>
         <div class="torder" id="torder"></div>
       </div>
       <div class="dsec">
-        <div class="drow" style="justify-content:space-between"><span class="dl" id="homeWidLbl">Виджеты вкладки «Главная»</span></div>
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="homeWidLbl">Виджеты вкладки «Главная»</span><button class="b sm" id="customReset" title="Вернуть положение, размер, приветствие и порядок к значениям по умолчанию">↺ <span id="resetAllLbl">Сбросить всё</span></button></div>
         <div class="torder" id="homeOrder"></div>
-      </div>
-      <div class="dsec">
-        <button class="b sm" id="customReset" style="width:100%" title="Вернуть положение, размер, приветствие и порядок к значениям по умолчанию">↺ <span id="resetAllLbl">Сбросить всё</span></button>
       </div>
     </div>
 
@@ -716,8 +886,8 @@
     shotTitle: { ru: 'Скриншот области (Ctrl+Alt+X)', en: 'Area screenshot (Ctrl+Alt+X)' },
     tabCustomTitle: { ru: 'Кастомизация', en: 'Customization' },
     tabCustom: { ru: 'Кастом', en: 'Custom' },
-    posLbl: { ru: 'Положение на экране', en: 'Screen position' },
-    posLeft: { ru: 'Слева', en: 'Left' }, posCenter: { ru: 'Центр', en: 'Center' }, posRight: { ru: 'Справа', en: 'Right' },
+    posLbl: { ru: 'Положение', en: 'Position' },
+    posLeft: { ru: 'Слева', en: 'Left' }, posCenter: { ru: 'Центр', en: 'Center' }, posRight: { ru: 'Справа', en: 'Right' }, posBottom: { ru: 'Снизу', en: 'Bottom' }, posBottomTitle: { ru: 'На панели задач — раскрывается вверх', en: 'On the taskbar — opens upwards' },
     sizeLbl: { ru: 'Размер острова', en: 'Island size' },
     greetLbl: { ru: 'Своё приветствие', en: 'Custom greeting' },
     greetReset: { ru: 'Авто', en: 'Auto' },
@@ -830,6 +1000,31 @@
     autostartLabel: { ru: 'Запускать вместе с Windows', en: 'Start with Windows' },
     autostartTitle: { ru: 'Автозапуск', en: 'Autostart' },
     autohideLabel: { ru: 'Автоскрытие (браузер, полный экран)', en: 'Auto-hide (browser, fullscreen)' },
+    gahideLabel: { ru: 'Автоскрытие в играх', en: 'Auto-hide in games' },
+    dlLoading: { ru: 'Загрузка', en: 'Downloading' }, dlPerSec: { ru: '/с', en: '/s' }, dlDone: { ru: 'Скачано: ', en: 'Downloaded: ' },
+    fxOpenLbl: { ru: 'Эффекты острова: трава и волна под музыку', en: 'Island effects: grass and music wave' },
+    fxBackLbl: { ru: 'Дизайн', en: 'Design' }, fxTitle: { ru: 'Эффекты острова', en: 'Island effects' },
+    fxGrassLbl: { ru: 'Трава по верху острова', en: 'Grass along the top' }, fxWaveLbl: { ru: 'Волна внизу острова', en: 'Music wave at the bottom' },
+    fxWindLbl: { ru: 'Ветер', en: 'Wind' }, fxDensLbl: { ru: 'Густота', en: 'Density' }, fxMusLbl: { ru: 'Под музыку', en: 'To the music' },
+    fxStyleLbl: { ru: 'Вид', en: 'Style' },
+    fxNote: { ru: 'Волна двигается в такт звуку компьютера — ничего не записывается.', en: 'The wave moves to your PC sound — nothing is recorded.' },
+    gahideTitle: { ru: 'Прятать остров, когда запущена игра (в режиме игры остров не прячется)', en: 'Hide the island while a game is running (game mode keeps it visible)' },
+    tabGame: { ru: 'Игра', en: 'Game' },
+    tabGameTitle: { ru: 'Режим игры', en: 'Game mode' },
+    gmTitle: { ru: 'Режим игры', en: 'Game mode' },
+    gmSub: { ru: 'FPS, нагрузка ПК и время в игре — прямо в острове', en: 'FPS, PC load and play time right in the island' },
+    gmSwTitle: { ru: 'Включить режим игры', en: 'Turn game mode on' },
+    gmSkinLbl: { ru: 'Дизайн в игре', en: 'In-game design' },
+    gsRed: { ru: 'Красный', en: 'Red' }, gsDef: { ru: 'Обычный', en: 'Classic' }, gsNeon: { ru: 'Неон', en: 'Neon' },
+    gmTodayLbl: { ru: 'Сегодня в играх', en: 'Played today' },
+    gmTodayEmpty: { ru: 'Сегодня ещё не играл', en: 'No games yet today' },
+    gmNowOff: { ru: 'Режим выключен — включи переключатель сверху.', en: 'Game mode is off — flip the switch above.' },
+    gmNowIdle: { ru: 'Игра не запущена — открой игру, остров переключится сам.', en: 'No game running — launch one and the island switches by itself.' },
+    gmNowPlaying: { ru: 'Сейчас: ', en: 'Now: ' },
+    gmInGame: { ru: ' · в игре ', en: ' · playing for ' },
+    gmFpsNoRtss: { ru: 'Для FPS запусти RivaTuner Statistics Server (MSI Afterburner)', en: 'Start RivaTuner Statistics Server (MSI Afterburner) to see FPS' },
+    gmFpsNotHooked: { ru: 'RivaTuner запущен, но ещё не видит эту игру', en: 'RivaTuner is running but does not see this game yet' },
+    gmNote: { ru: 'FPS — через RivaTuner (идёт с MSI Afterburner). В настройках игры выбери «Окно без рамки», иначе остров не виден поверх.', en: 'FPS comes from RivaTuner (bundled with MSI Afterburner). Set the game to Borderless Window, otherwise the island cannot appear on top.' },
     autohideTitle: { ru: 'Прятать остров в браузере и полноэкранных окнах', en: 'Hide the island in browsers and fullscreen windows' },
     notifLabel: { ru: 'Сообщения Discord/Telegram в острове', en: 'Discord/Telegram messages on the island' },
     notifTitle: { ru: 'Показывать уведомления о сообщениях в острове', en: 'Show message notifications on the island' },
@@ -967,7 +1162,7 @@
   var T = { total: 25 * 60, left: 25 * 60, running: false, done: false, endAt: 0, doneAt: 0 };
   var S = { running: false, base: 0, startAt: 0, laps: [], lastLap: 0 };
   var F = { on: false, start: 0, apps: [], cur: '', sum: null };
-  var M = { ok: false, key: '', title: '', artist: '', status: '', app: '', dur: 0, base: 0, rx: 0, cover: '', shuffle: false, repeat: 'None', canShuffle: false, canRepeat: false };
+  var M = { ok: false, key: '', title: '', artist: '', status: '', app: '', dur: 0, base: 0, rx: 0, cover: '', shuffle: false, repeat: 'None', canShuffle: false, canRepeat: false, estKey: '', estAcc: 0, estSince: 0 };
   var lastCover = null;
   var tab = 'home';
   var typing = false;
@@ -1007,6 +1202,7 @@
     var pl = document.querySelector('[data-pos="left"]'); if (pl) pl.textContent = t('posLeft');
     var pc = document.querySelector('[data-pos="center"]'); if (pc) pc.textContent = t('posCenter');
     var pr = document.querySelector('[data-pos="right"]'); if (pr) pr.textContent = t('posRight');
+    var pbt = document.querySelector('[data-pos="bottom"]'); if (pbt) { pbt.textContent = t('posBottom'); pbt.title = t('posBottomTitle'); }
     if (typeof TAB_LABEL === 'object') { TAB_LABEL.home = t('tabHome'); TAB_LABEL.timer = t('tabTimer'); TAB_LABEL.focus = t('tabFocus'); TAB_LABEL.day = t('tabDay'); TAB_LABEL.apps = t('tabApps'); TAB_LABEL.notes = t('tabNotes'); TAB_LABEL.design = t('tabDesign'); TAB_LABEL.custom = t('tabCustom'); if (typeof renderTorder === 'function') renderTorder(); }
     setTtl('shot', 'shotTitle');
     setTtl('hide', 'hideTitle');
@@ -1040,6 +1236,20 @@
     qAll('[data-info]').forEach(function (b) { var m = infoMap[b.dataset.info]; if (m) { b.title = t(m[0]); b.textContent = t(m[1]); } });
     setTxt('autostartLbl', 'autostartLabel'); setTtl('auto', 'autostartTitle');
     setTxt('autohideLbl', 'autohideLabel'); setTtl('ahide', 'autohideTitle');
+    setTxt('gahideLbl', 'gahideLabel'); setTtl('gahide', 'gahideTitle');
+    ['fxOpenLbl', 'fxBackLbl', 'fxTitle', 'fxGrassLbl', 'fxWaveLbl', 'fxWindLbl', 'fxDensLbl', 'fxMusLbl', 'fxStyleLbl', 'fxNote'].forEach(function (k) { setTxt(k, k); });
+    var fxw = { calm: ['Штиль', 'Calm'], breeze: ['Ветерок', 'Breeze'], storm: ['Буря', 'Storm'] }, fxd = { low: ['Редкая', 'Sparse'], mid: ['Средняя', 'Medium'], high: ['Густая', 'Dense'] }, fxs = { wave: ['Волна', 'Wave'], line: ['Линия', 'Line'], bars: ['Столбики', 'Bars'] };
+    var li = LANG === 'en' ? 1 : 0;
+    qAll('[data-wind]').forEach(function (b) { b.textContent = fxw[b.dataset.wind][li]; });
+    qAll('[data-dens]').forEach(function (b) { b.textContent = fxd[b.dataset.dens][li]; });
+    qAll('[data-ws]').forEach(function (b) { b.textContent = fxs[b.dataset.ws][li]; });
+    var fh = $('fxGrassHLbl'); if (fh && fh.firstChild) fh.firstChild.nodeValue = (li ? 'Height ' : 'Высота ');
+    var fw = $('fxWaveHLbl'); if (fw && fw.firstChild) fw.firstChild.nodeValue = (li ? 'Height ' : 'Высота ');
+    var fs = $('fxSensLbl'); if (fs && fs.firstChild) fs.firstChild.nodeValue = (li ? 'Sensitivity ' : 'Чувствит. ');
+    setTtl('tabGame', 'tabGameTitle'); var lgm = $('tabGame') && $('tabGame').querySelector('.lbl'); if (lgm) lgm.textContent = t('tabGame');
+    setTxt('gmTitle', 'gmTitle'); setTxt('gmSub', 'gmSub'); setTtl('gmSw', 'gmSwTitle'); setTxt('gmSkinLbl', 'gmSkinLbl');
+    setTxt('gsRed', 'gsRed'); setTxt('gsDef', 'gsDef'); setTxt('gsNeon', 'gsNeon'); setTxt('gmTodayLbl', 'gmTodayLbl'); setTxt('gmNote', 'gmNote');
+    try { renderGamePane(); } catch (e) {}
     setTxt('notifLbl', 'notifLabel'); setTtl('ntf', 'notifTitle');
     setTxt('langLbl', 'languageLabel');
     setTxt('soundLbl', 'soundLabel'); setTxt('soundTest', 'soundTest'); setTxt('soundPick', 'soundPick'); setTxt('soundClear', 'soundReset');
@@ -1081,11 +1291,14 @@
   });
   renderLangSeg();
 
+  // Режим игры: G — живые данные из игры (FPS, CPU…), GS — настройки режима.
+  var G = { active: false }, GS = { gameMode: false, gameAutoHide: true, gameSkin: 'red', today: [], playing: '' };
   function mode() {
     if (islandDragShrink) return 'idle';
     if (NT.on) return 'notif';
     if (over || pinned || dragging || typing) return 'full';
     if (popup) return 'pop';
+    if (G && G.active && GS && GS.gameMode) return 'game';
     if (CALL.on || T.running || T.done || S.running || F.on || remNow() || (M.ok && M.status === 'Playing')) return 'multi';
     return 'idle';
   }
@@ -1187,6 +1400,14 @@
     if (M.canShuffle) M.shuffle = d.shuffle;
     if (M.canRepeat) M.repeat = d.repeat;
     if (!dragging) { M.base = d.pos || 0; M.rx = Date.now(); }
+    // Плеер не сообщает время (например, Яндекс Музыка из Microsoft Store) — считаем сами,
+    // сколько играет текущий трек: с нуля при смене трека, на паузе счёт стоит.
+    if (!(M.dur > 0)) {
+      var nowT = Date.now(), playingNow = M.status === 'Playing';
+      if (M.key !== M.estKey) { M.estKey = M.key; M.estAcc = 0; M.estSince = playingNow ? nowT : 0; }
+      else if (playingNow && !M.estSince) M.estSince = nowT;
+      else if (!playingNow && M.estSince) { M.estAcc += nowT - M.estSince; M.estSince = 0; }
+    }
     if (M.status === 'Playing' && M.title && (M.key !== prevKey || !wasPlaying && prevKey === '')) {
       showPopup(trackLine(), 3500, false, true);
     }
@@ -1290,9 +1511,11 @@
   function setTab(t) {
     if (t !== 'home' && t !== 'lock' && !LIC.pro) { showLock(''); return; }
     tab = t; island.dataset.tab = t;
-    Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) { b.classList.toggle('sel', b.dataset.tab === t); });
-    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === t); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) { b.classList.toggle('sel', b.dataset.tab === (t === 'fx' ? 'design' : t)); });
+    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'game', 'design', 'custom', 'fx', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === t); });
     if (t !== 'day') dyReset();
+    if (t === 'fx') fxLoad();
+    if (t === 'game') gameLoad();
     draw();
   }
   Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) {
@@ -1319,7 +1542,7 @@
   function showLock(msg) {
     tab = 'lock'; island.dataset.tab = 'lock';
     Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) { b.classList.remove('sel'); });
-    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === 'lock'); });
+    ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'game', 'design', 'custom', 'fx', 'lock'].forEach(function (n) { $('p-' + n).classList.toggle('on', n === 'lock'); });
     $('lkTitle').textContent = LIC.pro ? t('licenseName') + LIC.name : (LIC.expired ? t('licenseExpired') : t('lockTitleDefault'));
     $('lkMsg').textContent = msg || '';
     dyReset(); draw();
@@ -1902,13 +2125,13 @@
   applyTheme(); renderDesign();
 
   /* ---------- Кастомизация: позиция, размер, своё приветствие, порядок вкладок ---------- */
-  var TAB_LABEL = { home: 'Главная', timer: 'Таймер', focus: 'Не беспокоить', day: 'Итоги', apps: 'Программы', notes: 'Заметки', design: 'Дизайн', custom: 'Кастом' };
+  var TAB_LABEL = { home: 'Главная', timer: 'Таймер', focus: 'Не беспокоить', day: 'Итоги', apps: 'Программы', notes: 'Заметки', game: 'Игра', design: 'Дизайн', custom: 'Кастом' };
   var HOME_WIDGET_LABEL = { clock: 'Часы и погода', app: 'Текущее приложение', media: 'Плеер' };
   var HOME_WIDGET_EL = { clock: 'hwClock', app: 'appc', media: 'hwMedia' };
   var SIZE_SCALE = { small: 0.85, medium: 1, large: 1.15 };
   var C = {
     position: 'center', size: 'medium', greeting: '',
-    tabOrder: ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom'],
+    tabOrder: ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'game', 'design', 'custom'],
     homeOrder: ['clock', 'app', 'media'], homeHidden: []
   };
   var cSaveTimer = null;
@@ -1918,6 +2141,8 @@
   function applyDock() {
     if (C.position === 'left' || C.position === 'right') { island.dataset.dock = C.position; document.body.dataset.dock = C.position; }
     else { delete island.dataset.dock; delete document.body.dataset.dock; }
+    if (C.position === 'bottom') { island.dataset.bottom = '1'; document.body.dataset.bottom = '1'; }
+    else { delete island.dataset.bottom; delete document.body.dataset.bottom; }
     try { draw(); } catch (e) {}
   }
   function renderSizeSeg() { qAll('[data-size]').forEach(function (b) { b.classList.toggle('sel', b.dataset.size === C.size); }); }
@@ -1929,18 +2154,19 @@
       var el = wrap.querySelector('[data-tab="' + id + '"]');
       if (el) wrap.appendChild(el);
     });
-    var shotBtn = $('shot'); if (shotBtn) wrap.appendChild(shotBtn); // кнопка скриншота — всегда последней
   }
   function renderTorder() {
     var wrap = $('torder'); if (!wrap) return;
     wrap.innerHTML = '';
     C.tabOrder.forEach(function (id, i) {
       var row = document.createElement('div'); row.className = 'trow';
-      var lbl = document.createElement('span'); lbl.textContent = TAB_LABEL[id] || id; row.appendChild(lbl);
+      var tl = document.createElement('div'); tl.className = 'tl';
+      var num = document.createElement('span'); num.className = 'num'; num.textContent = String(i + 1); tl.appendChild(num);
+      var lbl = document.createElement('span'); lbl.textContent = TAB_LABEL[id] || id; tl.appendChild(lbl); row.appendChild(tl);
       var btns = document.createElement('div'); btns.className = 'tbtns';
-      var up = document.createElement('button'); up.textContent = '↑'; up.disabled = i === 0;
+      var up = document.createElement('button'); up.textContent = '‹'; up.title = '←'; up.disabled = i === 0;
       up.addEventListener('click', function () { moveTab(i, -1); });
-      var dn = document.createElement('button'); dn.textContent = '↓'; dn.disabled = i === C.tabOrder.length - 1;
+      var dn = document.createElement('button'); dn.textContent = '›'; dn.title = '→'; dn.disabled = i === C.tabOrder.length - 1;
       dn.addEventListener('click', function () { moveTab(i, 1); });
       btns.appendChild(up); btns.appendChild(dn); row.appendChild(btns);
       wrap.appendChild(row);
@@ -1993,6 +2219,7 @@
   qAll('[data-pos]').forEach(function (b) { b.addEventListener('click', function () {
     C.position = b.dataset.pos;
     if (C.position === 'left' || C.position === 'right') C.posY = null; // кнопкой — по центру стены по высоте
+    if (C.position === 'bottom') C.posX = null; // кнопкой — в пустую левую часть панели задач
     renderPosSeg(); saveC();
   }); });
   qAll('[data-size]').forEach(function (b) { b.addEventListener('click', function () { C.size = b.dataset.size; renderSizeSeg(); applyScale(); saveC(); }); });
@@ -2000,7 +2227,7 @@
   if ($('greetReset')) $('greetReset').addEventListener('click', function () { C.greeting = ''; $('greetInput').value = ''; saveC(); });
   function applyCFromServer(r) {
     if (r) {
-      if (['center', 'left', 'right', 'custom'].indexOf(r.position) >= 0) C.position = r.position;
+      if (['center', 'left', 'right', 'custom', 'bottom'].indexOf(r.position) >= 0) C.position = r.position;
       if (['small', 'medium', 'large'].indexOf(r.size) >= 0) C.size = r.size;
       if (typeof r.greeting === 'string') C.greeting = r.greeting;
       C.posX = typeof r.posX === 'number' ? r.posX : null;
@@ -2074,6 +2301,271 @@
   $('ahide').addEventListener('click', function () {
     window.api.autohideSet(!$('ahide').classList.contains('on')).then(drawAH).catch(function () {});
   });
+  /* ---------- Загрузки из браузера ---------- */
+  var DL = { items: [] }, dlDoneAt = 0, dlDoneName = '';
+  function fmtBytes(b) { if (b >= 1073741824) return (b / 1073741824).toFixed(1) + (LANG === 'en' ? ' GB' : ' ГБ'); if (b >= 1048576) return (b / 1048576).toFixed(b >= 104857600 ? 0 : 1) + (LANG === 'en' ? ' MB' : ' МБ'); return Math.max(1, Math.round(b / 1024)) + (LANG === 'en' ? ' KB' : ' КБ'); }
+  function drawDl() {
+    var on = DL.items && DL.items.length > 0, done = !on && Date.now() - dlDoneAt < 3000;
+    var tip = '';
+    if (on) {
+      var tot = 0, spd = 0; DL.items.forEach(function (x) { tot += x.size; spd += x.speed || 0; });
+      tip = t('dlLoading') + (DL.items.length > 1 ? ' (' + DL.items.length + ')' : '') + ': ' + DL.items.map(function (x) { return x.name || '…'; }).join(', ') + ' — ' + fmtBytes(tot) + (spd > 0 ? ', ' + fmtBytes(spd) + t('dlPerSec') : '');
+      $('dlsz').textContent = fmtBytes(tot);
+    } else if (done) tip = t('dlDone') + dlDoneName;
+    ['dlr1', 'dlr2'].forEach(function (id) { var el = $(id); el.hidden = !(on || done); el.classList.toggle('done', done); el.title = tip; });
+    $('dlsz').hidden = !on;
+  }
+  try {
+    window.api.onDl(function (d) { DL = d || { items: [] }; drawDl(); draw(); });
+    window.api.onDlDone(function (d) {
+      dlDoneAt = Date.now(); dlDoneName = (d && d.name) || ''; drawDl();
+      showPopup('✅ ' + t('dlDone') + dlDoneName, 4000, false);
+      setTimeout(function () { drawDl(); draw(); }, 3100);
+    });
+  } catch (e) {}
+
+  /* ---------- Эффекты экрана: трава сверху, волна снизу ---------- */
+  var FX = null, fxTimer = null;
+  function fxRender() {
+    if (!FX) return;
+    swDraw('fxGrassSw', FX.grass.on); swDraw('fxGrassMus', FX.grass.music); swDraw('fxWaveSw', FX.wave.on);
+    $('fxGrassCard').classList.toggle('off', !FX.grass.on); $('fxWaveCard').classList.toggle('off', !FX.wave.on);
+    qAll('[data-gc]').forEach(function (b) { b.classList.toggle('sel', b.dataset.gc === FX.grass.color); });
+    $('fxGrassCustom').classList.toggle('sel', FX.grass.color === 'custom');
+    qAll('[data-wp]').forEach(function (b) { b.classList.toggle('sel', b.dataset.wp === FX.wave.palette); });
+    $('fxWaveCustom').classList.toggle('sel', FX.wave.palette === 'custom');
+    qAll('[data-wind]').forEach(function (b) { b.classList.toggle('sel', b.dataset.wind === FX.grass.wind); });
+    qAll('[data-dens]').forEach(function (b) { b.classList.toggle('sel', b.dataset.dens === FX.grass.density); });
+    qAll('[data-ws]').forEach(function (b) { b.classList.toggle('sel', b.dataset.ws === FX.wave.style); });
+    if (document.activeElement !== $('fxGrassH')) $('fxGrassH').value = FX.grass.height;
+    if (document.activeElement !== $('fxWaveH')) $('fxWaveH').value = FX.wave.height;
+    if (document.activeElement !== $('fxSens')) $('fxSens').value = FX.wave.sens;
+    $('fxGrassCustom').value = FX.grass.custom; $('fxWaveCustom').value = FX.wave.custom;
+  }
+  function fxLoad() { try { window.api.fxGet().then(function (d) { FX = d; fxRender(); fxKick(); }).catch(function () {}); } catch (e) {} }
+  function fxSet(patch, now) {
+    if (!FX) return;
+    if (patch.grass) Object.assign(FX.grass, patch.grass);
+    if (patch.wave) Object.assign(FX.wave, patch.wave);
+    fxRender(); fxKick();
+    clearTimeout(fxTimer);
+    fxTimer = setTimeout(function () { try { window.api.fxSet(patch).then(function (d) { if (d) { FX = d; fxRender(); } }).catch(function () {}); } catch (e) {} }, now ? 0 : 120);
+  }
+  /* --- отрисовка травы и волны внутри острова --- */
+  var fxc = $('fxc'), fctx = fxc.getContext('2d'), fxBlades = [], fxBladesKey = '';
+  var fxAn = null, fxData = null, fxAudioTried = false, fxLevel = 0, fxBands = [], fxBandsS = [];
+  function fxInitAudio() {
+    if (fxAudioTried) return; fxAudioTried = true;
+    try {
+      navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).then(function (st) {
+        st.getVideoTracks().forEach(function (tr) { tr.stop(); });
+        if (!st.getAudioTracks().length) return;
+        var ac = new AudioContext();
+        var src = ac.createMediaStreamSource(new MediaStream(st.getAudioTracks()));
+        fxAn = ac.createAnalyser(); fxAn.fftSize = 2048; fxAn.smoothingTimeConstant = 0.72;
+        src.connect(fxAn); fxData = new Uint8Array(fxAn.frequencyBinCount);
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  function fxReadBands(n, sens) {
+    if (fxBands.length !== n) { fxBands = new Array(n).fill(0); fxBandsS = new Array(n).fill(0); }
+    var gain = 0.6 + (sens / 100) * 1.6, sum = 0, playingNow = M.ok && M.status === 'Playing';
+    if (fxAn) {
+      fxAn.getByteFrequencyData(fxData);
+      var binHz = 24000 / fxData.length;
+      for (var i = 0; i < n; i++) {
+        var f0 = 35 * Math.pow(400, i / n), f1 = 35 * Math.pow(400, (i + 1) / n);
+        var b0 = Math.max(1, Math.floor(f0 / binHz)), b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz)), mx = 0;
+        for (var k = b0; k < b1 && k < fxData.length; k++) mx = Math.max(mx, fxData[k]);
+        fxBands[i] = Math.min(1, Math.pow(mx / 255, 1.6) * gain * (0.75 + i / n * 0.6)); sum += fxBands[i];
+      }
+    } else {
+      var tt = performance.now() / 1000;
+      for (var j = 0; j < n; j++) { fxBands[j] = playingNow ? (0.3 + 0.22 * Math.sin(tt * 3.1 + j * 0.45) * Math.sin(tt * 1.3 + j * 0.13)) * gain * 0.7 : 0; sum += fxBands[j]; }
+    }
+    for (var q = 0; q < n; q++) fxBandsS[q] += (fxBands[q] - fxBandsS[q]) * (fxBands[q] > fxBandsS[q] ? 0.55 : 0.18);
+    fxLevel += ((sum / n) - fxLevel) * 0.25;
+    return fxBandsS;
+  }
+  function fxHexHsl(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return [120, 60, 45];
+    var r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, sa = 0;
+    if (mx !== mn) { var d = mx - mn; sa = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; }
+    return [h, sa * 100, l * 100];
+  }
+  function fxHsl(a, al) { return 'hsla(' + a[0].toFixed(0) + ',' + Math.min(100, a[1]).toFixed(0) + '%,' + Math.min(100, a[2]).toFixed(0) + '%,' + (al == null ? 1 : al) + ')'; }
+  var FX_GRASS = {
+    green: function (j) { return [100 + j * 30, 55 + j * 15, 28 + j * 22]; },
+    autumn: function (j) { return [18 + j * 30, 70 + j * 15, 38 + j * 18]; },
+    sakura: function (j) { return [330 + j * 20, 60 + j * 20, 62 + j * 16]; },
+    ice: function (j) { return [185 + j * 20, 55 + j * 20, 62 + j * 18]; },
+    neon: function (j, tm, x) { return [(x * 0.9 + tm * 40) % 360, 90, 55 + j * 10]; }
+  };
+  var FX_WAVE = {
+    neon: function (pp) { return [185 + pp * 110, 95, 60]; },
+    rainbow: function (pp, tm) { return [(pp * 300 + tm * 50) % 360, 90, 58]; },
+    fire: function (pp) { return [pp * 50, 100, 52]; },
+    ocean: function (pp) { return [200 - pp * 40, 85, 55]; },
+    white: function () { return [0, 0, 96]; }
+  };
+  function fxMakeBlades() {
+    var g = FX.grass, step = g.density === 'low' ? 5 : g.density === 'high' ? 2 : 3.2, x = 0;
+    fxBlades = [];
+    var seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    while (x < 520) { fxBlades.push({ x: x + rnd() * step, h: 0.45 + rnd() * 0.55, w: 1.2 + rnd() * 1.8, j: rnd(), ph: rnd() * 6.28, st: 0.7 + rnd() * 0.6 }); x += step * (0.6 + rnd() * 0.8); }
+    fxBlades.sort(function (a, b) { return b.h - a.h; });
+    fxBladesKey = g.density;
+  }
+  function fxDrawGrass(tm, W, Hh) {
+    var g = FX.grass;
+    if (fxBladesKey !== g.density || !fxBlades.length) fxMakeBlades();
+    var amp = g.wind === 'calm' ? 0.07 : g.wind === 'storm' ? 0.34 : 0.17, spd = g.wind === 'calm' ? 0.8 : g.wind === 'storm' ? 2.6 : 1.5;
+    var mus = g.music ? Math.min(1, fxLevel * 2.2) : 0, base = g.color === 'custom' ? fxHexHsl(g.custom) : null;
+    var gust = Math.sin(tm * spd * 0.37) * 0.5 + Math.sin(tm * spd * 0.11 + 1.3) * 0.5;
+    for (var i = 0; i < fxBlades.length; i++) {
+      var b = fxBlades[i]; if (b.x > W + 4) continue;
+      var c = base ? [base[0] + (b.j - .5) * 24, base[1], base[2] * (0.7 + b.j * 0.55)] : (FX_GRASS[g.color] || FX_GRASS.green)(b.j, tm, b.x);
+      var a = (Math.sin(tm * spd * b.st + b.x * 0.05 + b.ph) * 0.6 + gust * 0.6) * amp + mus * 0.25 * Math.sin(tm * 9 + b.ph);
+      var hh = Hh * b.h * (1 + mus * 0.3), bend = Math.sin(a) * hh, tipY = Math.cos(a) * hh;
+      fctx.beginPath();
+      fctx.moveTo(b.x - b.w, 0);
+      fctx.quadraticCurveTo(b.x - b.w * 0.3 + bend * 0.35, tipY * 0.55, b.x + bend, tipY);
+      fctx.quadraticCurveTo(b.x + b.w * 0.3 + bend * 0.35, tipY * 0.55, b.x + b.w, 0);
+      fctx.closePath();
+      var gr = fctx.createLinearGradient(0, 0, 0, Math.max(1, tipY));
+      gr.addColorStop(0, fxHsl([c[0], c[1], c[2] * 0.55])); gr.addColorStop(1, fxHsl([c[0], c[1], c[2] * 1.15]));
+      fctx.fillStyle = gr; fctx.fill();
+    }
+  }
+  function fxWaveColor(pp, tm) { var w = FX.wave; if (w.palette === 'custom') { var c = fxHexHsl(w.custom); return [c[0] + (pp - .5) * 30, c[1], c[2]]; } return (FX_WAVE[w.palette] || FX_WAVE.neon)(pp, tm); }
+  function fxDrawWave(tm, W, H, maxH) {
+    var w = FX.wave, n = w.style === 'bars' ? 40 : 32, v = fxReadBands(n, w.sens), baseY = H;
+    var grad = fctx.createLinearGradient(0, 0, W, 0);
+    for (var s0 = 0; s0 <= 6; s0++) grad.addColorStop(s0 / 6, fxHsl(fxWaveColor(s0 / 6, tm)));
+    if (w.style === 'bars') {
+      var cnt = Math.max(8, Math.floor(W / 7)), bw = W / cnt, gap = Math.max(1, bw * 0.3);
+      fctx.fillStyle = grad; fctx.globalAlpha = 0.85;
+      for (var i = 0; i < cnt; i++) {
+        var d = Math.abs(i / (cnt - 1) - 0.5) * 2, h = Math.max(1.5, v[Math.min(n - 1, Math.floor(d * (n - 1)))] * maxH);
+        var x = i * bw + gap / 2, ww = bw - gap, r = Math.min(ww / 2, 2);
+        fctx.beginPath(); if (fctx.roundRect) fctx.roundRect(x, baseY - h, ww, h, [r, r, 0, 0]); else fctx.rect(x, baseY - h, ww, h); fctx.fill();
+      }
+      fctx.globalAlpha = 1; return;
+    }
+    var pts = [], m = 40;
+    for (var k = 0; k <= m; k++) {
+      var p = k / m, dd = Math.abs(p - 0.5) * 2, amp = v[Math.min(n - 1, Math.floor(dd * (n - 1)))] * maxH;
+      var run = (Math.sin(p * 14 - tm * 3.2) * 0.5 + 0.5) * (1.5 + fxLevel * maxH * 0.25);
+      pts.push([p * W, baseY - Math.max(1, amp * (0.85 + 0.15 * Math.sin(p * 9 + tm * 2)) + run)]);
+    }
+    function path() { fctx.moveTo(pts[0][0], pts[0][1]); for (var z = 1; z < pts.length - 1; z++) fctx.quadraticCurveTo(pts[z][0], pts[z][1], (pts[z][0] + pts[z + 1][0]) / 2, (pts[z][1] + pts[z + 1][1]) / 2); fctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]); }
+    if (w.style !== 'line') {
+      fctx.beginPath(); path(); fctx.lineTo(W, H); fctx.lineTo(0, H); fctx.closePath();
+      fctx.globalAlpha = 0.45; fctx.fillStyle = grad; fctx.fill(); fctx.globalAlpha = 1;
+    }
+    fctx.beginPath(); path();
+    fctx.strokeStyle = grad; fctx.lineWidth = w.style === 'line' ? 2 : 1.6; fctx.shadowColor = fxHsl(fxWaveColor(.5, tm), .9); fctx.shadowBlur = 8; fctx.stroke(); fctx.shadowBlur = 0;
+  }
+  var fxLast = 0, fxRunning = false, fxIdleTimer = null;
+  // Цикл анимации крутится только пока эффект включён и остров на экране; иначе полностью стоит.
+  function fxKick() { if (!fxRunning) { fxRunning = true; requestAnimationFrame(fxFrame); } }
+  function fxFrame(now) {
+    var on = FX && (FX.grass.on || FX.wave.on);
+    var md = island.dataset.mode;
+    var show = on && !island.classList.contains('gone') && md !== 'game';
+    if (!show) {
+      if (!fxc.hidden) fxc.hidden = true;
+      fxRunning = false;
+      clearTimeout(fxIdleTimer); if (on) fxIdleTimer = setTimeout(fxKick, 1500); // проверим позже, не появился ли остров
+      return;
+    }
+    requestAnimationFrame(fxFrame);
+    var musicNow = M.ok && M.status === 'Playing';
+    if (now - fxLast < (musicNow ? 40 : 66)) return; // ~25 кадров/с под музыку, ~15 в тишине
+    fxLast = now;
+    fxc.hidden = false;
+    var W = island.clientWidth, H = island.clientHeight, dpr = window.devicePixelRatio || 1;
+    if (fxc.width !== Math.round(W * dpr) || fxc.height !== Math.round(H * dpr)) { fxc.width = Math.round(W * dpr); fxc.height = Math.round(H * dpr); }
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    fctx.clearRect(0, 0, W, H);
+    var tm = now / 1000, big = md === 'full' || md === 'notif';
+    if (FX.wave.on || FX.grass.music) fxInitAudio();
+    if (FX.wave.on) fxDrawWave(tm, W, H, H * (FX.wave.height / 160) * (big ? 0.3 : 0.55));
+    else if (FX.grass.music) fxReadBands(24, 60);
+    if (FX.grass.on) fxDrawGrass(tm, W, Math.round(FX.grass.height * (big ? 0.3 : 0.2)));
+  }
+  if ($('fxOpen')) $('fxOpen').addEventListener('click', function () { setTab('fx'); });
+  if ($('fxBack')) $('fxBack').addEventListener('click', function () { setTab('design'); });
+  if ($('fxGrassSw')) $('fxGrassSw').addEventListener('click', function () { fxSet({ grass: { on: !FX.grass.on } }, true); });
+  if ($('fxWaveSw')) $('fxWaveSw').addEventListener('click', function () { fxSet({ wave: { on: !FX.wave.on } }, true); });
+  if ($('fxGrassMus')) $('fxGrassMus').addEventListener('click', function () { fxSet({ grass: { music: !FX.grass.music } }, true); });
+  qAll('[data-gc]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ grass: { color: b.dataset.gc } }, true); }); });
+  qAll('[data-wp]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ wave: { palette: b.dataset.wp } }, true); }); });
+  qAll('[data-wind]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ grass: { wind: b.dataset.wind } }, true); }); });
+  qAll('[data-dens]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ grass: { density: b.dataset.dens } }, true); }); });
+  qAll('[data-ws]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ wave: { style: b.dataset.ws } }, true); }); });
+  if ($('fxGrassCustom')) $('fxGrassCustom').addEventListener('input', function () { fxSet({ grass: { color: 'custom', custom: $('fxGrassCustom').value } }); });
+  if ($('fxWaveCustom')) $('fxWaveCustom').addEventListener('input', function () { fxSet({ wave: { palette: 'custom', custom: $('fxWaveCustom').value } }); });
+  if ($('fxGrassH')) $('fxGrassH').addEventListener('input', function () { fxSet({ grass: { height: +$('fxGrassH').value } }); });
+  if ($('fxWaveH')) $('fxWaveH').addEventListener('input', function () { fxSet({ wave: { height: +$('fxWaveH').value } }); });
+  if ($('fxSens')) $('fxSens').addEventListener('input', function () { fxSet({ wave: { sens: +$('fxSens').value } }); });
+  fxLoad();
+
+  /* ---------- Режим игры ---------- */
+  function fmtGT(s) { s = Math.max(0, Math.floor(s || 0)); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? h + ':' + p2(m) + ':' + p2(x) : m + ':' + p2(x); }
+  function fmtGH(s) { s = Math.max(0, Math.floor(s || 0)); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return LANG === 'en' ? (h ? h + 'h ' : '') + m + 'm' : (h ? h + ' ч ' : '') + m + ' мин'; }
+  function drawGame() {
+    island.dataset.gskin = GS.gameSkin || 'red';
+    if (!G.active) return;
+    var fps = Number(G.fps);
+    $('gFps').textContent = fps >= 0 ? String(fps) : '—';
+    $('gFpsBox').className = 'gfps ' + (fps < 0 ? 'na' : fps >= 60 ? 'hi' : fps >= 30 ? 'mid' : 'lo');
+    $('gFpsBox').title = fps === -1 ? t('gmFpsNoRtss') : fps === -2 ? t('gmFpsNotHooked') : '';
+    $('gCpu').textContent = (G.cpu | 0) + '%'; $('gCpu').classList.toggle('hot', G.cpu >= 90);
+    $('gGpu').textContent = G.gpu >= 0 ? (G.gpu | 0) + '%' : '—'; $('gGpu').classList.toggle('hot', G.gpu >= 95);
+    $('gRam').textContent = (G.ram | 0) + '%'; $('gRam').classList.toggle('hot', G.ram >= 90);
+    $('gTime').textContent = fmtGT(G.sess);
+  }
+  function swDraw(id, on) { var el = $(id); if (!el) return; el.classList.toggle('on', !!on); el.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  function renderGamePane() {
+    swDraw('gmSw', GS.gameMode); swDraw('gahide', GS.gameAutoHide);
+    qAll('#gskins [data-gs]').forEach(function (b) { b.classList.toggle('sel', b.dataset.gs === GS.gameSkin); });
+    var now = $('gmNow');
+    if (now) {
+      if (!GS.gameMode) now.textContent = t('gmNowOff');
+      else if (G.active) { now.innerHTML = ''; var b = document.createElement('b'); b.textContent = G.name || ''; now.appendChild(document.createTextNode(t('gmNowPlaying'))); now.appendChild(b); now.appendChild(document.createTextNode(t('gmInGame') + fmtGT(G.sess))); }
+      else now.textContent = t('gmNowIdle');
+    }
+    var wrap = $('gmToday');
+    if (wrap) {
+      wrap.innerHTML = '';
+      var list = GS.today || [];
+      if (!list.length) { var e = document.createElement('div'); e.className = 'dl'; e.textContent = t('gmTodayEmpty'); wrap.appendChild(e); }
+      list.forEach(function (g) {
+        var r = document.createElement('div'); r.className = 'trow';
+        var a = document.createElement('span'); a.textContent = g.name;
+        var v = document.createElement('span'); v.className = 'mono'; v.textContent = fmtGH(g.sec);
+        r.appendChild(a); r.appendChild(v); wrap.appendChild(r);
+      });
+    }
+  }
+  function gameApply(d) { if (d) GS = d; renderGamePane(); draw(); }
+  function gameLoad() { try { window.api.gameGet().then(gameApply).catch(function () {}); } catch (e) {} }
+  function gameSet(patch) { try { window.api.gameSet(patch).then(gameApply).catch(function () {}); } catch (e) {} }
+  gameLoad();
+  if ($('gmSw')) $('gmSw').addEventListener('click', function () { gameSet({ gameMode: !GS.gameMode }); });
+  if ($('gahide')) $('gahide').addEventListener('click', function () { gameSet({ gameAutoHide: !GS.gameAutoHide }); });
+  qAll('#gskins [data-gs]').forEach(function (b) { b.addEventListener('click', function () { gameSet({ gameSkin: b.dataset.gs }); }); });
+  try {
+    window.api.onGame(function (d) {
+      var was = G.active; G = d || { active: false };
+      if (tab === 'game' && island.dataset.mode === 'full') renderGamePane();
+      if (was !== G.active) gameLoad();
+      draw();
+    });
+  } catch (e) {}
+
   function drawNT(on) { if (!$('ntf')) return; $('ntf').classList.toggle('on', !!on); $('ntf').setAttribute('aria-checked', on ? 'true' : 'false'); }
   window.api.notifGet().then(drawNT).catch(function () {});
   if ($('ntf')) $('ntf').addEventListener('click', function () {
@@ -2272,7 +2764,12 @@
     var wsum = 0, wn = 0;
     ['cclk', 'cr', 'ct', 'cs', 'cc', 'cf'].forEach(function (id) { var el = $(id); if (!el.hidden) { wsum += el.offsetWidth; wn++; } });
     if (music) { wsum += 200; wn++; }
-    var w = Math.min(28 + wsum + 12 * Math.max(0, wn - 1) + 16, 470);
+    // не шире окна острова: иначе края обрезаются и остров «ломается» при наведении (лишнее ужимает название трека)
+    var maxW = Math.max(200, Math.floor(((window.innerWidth || 440) - 16) / ((C && SIZE_SCALE && SIZE_SCALE[C.size]) || 1)));
+    var wRaw = 28 + wsum + 12 * Math.max(0, wn - 1) + 16;
+    island.classList.toggle('mtight', music && wRaw > maxW); // тесно — у музыки остаются обложка и «эквалайзер», без названия
+    var w = Math.min(wRaw, 470, maxW);
+    if (music && wRaw > maxW) w = Math.min(w, wRaw - 200 + 80);
     w = Math.max(w, 120);
     var first = true;
     ['cclk', 'cr', 'ct', 'cs', 'cc', 'cf'].forEach(function (id) {
@@ -2322,10 +2819,12 @@
     } else {
       seek.value = 0;
       seek.style.setProperty('--p', '0%');
-      $('sp').textContent = '–:––';
+      // длительности нет — слева показываем, сколько трек уже играет (считаем сами)
+      $('sp').textContent = (M.ok && M.title && M.estKey === M.key) ? mmss(M.estAcc + (M.estSince ? Date.now() - M.estSince : 0)) : '–:––';
       $('sd').textContent = '–:––';
     }
 
+    drawGame();
     island.dataset.mode = md;
   }
 
@@ -2386,7 +2885,17 @@
     });
   }
 
-  setInterval(tick, 250);
+  // Перерисовка по необходимости: быстро — только когда на острове что-то реально тикает,
+  // в покое — раз в секунду, а скрытый остров почти не трогаем (экономия процессора).
+  (function loop() {
+    tick();
+    var md = island.dataset.mode, music = M.ok && M.status === 'Playing';
+    var ms = island.classList.contains('gone') ? 3000
+      : (md === 'full' && (music || S.running || T.running)) ? 250
+      : (T.running || T.done || S.running || CALL.on || popup || NT.on) ? 500
+      : 1000;
+    setTimeout(loop, ms);
+  })();
   setInterval(function () { if (S.running && island.dataset.mode === 'full' && tab === 'timer') $('swt').textContent = swFmt(swMs()); }, 100);
   updateInfo(true);
   draw();

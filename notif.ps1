@@ -130,6 +130,7 @@ function Get-Avatar($x) {
 $last = -1
 $seen = @{}
 $failed = 0
+Add-Type -Namespace IslandMem -Name Ws -MemberDefinition '[DllImport("psapi.dll")] public static extern bool EmptyWorkingSet(IntPtr h);' -ErrorAction SilentlyContinue
 $memTick = 0
 
 while ($true) {
@@ -181,6 +182,7 @@ while ($true) {
   if ($memTick % 25 -eq 0) {
     if ($ParentPid -gt 0 -and -not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { exit }
     [System.GC]::Collect()
+    if ($memTick % 75 -eq 0) { try { [void][IslandMem.Ws]::EmptyWorkingSet((Get-Process -Id $PID).Handle) } catch { } }
   }
   Start-Sleep -Milliseconds 1200
 }

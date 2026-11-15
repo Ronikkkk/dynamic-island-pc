@@ -1,6 +1,6 @@
 {
   "name": "dynamic-island-pc",
-  "version": "1.0.17",
+  "version": "1.0.21",
   "description": "Остров для рабочего стола Windows",
   "main": "main.js",
   "scripts": {
@@ -26,11 +26,14 @@
       "index.html",
       "shot.html",
       "shot-preload.js",
+      "fx.html",
+      "fx-preload.js",
       "media.ps1",
       "icon.ps1",
       "volume.ps1",
       "notif.ps1",
       "toastact.ps1",
+      "gamestats.ps1",
       "assets/**/*",
       "!README.md",
       "!*.log",

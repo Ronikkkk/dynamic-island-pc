@@ -1,4 +1,4 @@
-param([string]$CmdFile, [int]$ParentPid = 0)
+param([string]$CmdFile, [int]$ParentPid = 0, [string]$LogPath = '')
 
 # Bridge to Windows system media sessions (SMTC).
 # Browsers, Yandex Music, Spotify and other players expose controls through it.
@@ -40,9 +40,10 @@ function Send-MediaKey([byte]$vk) {
 $VK_NEXT = 0xB0; $VK_PREV = 0xB1; $VK_PLAY = 0xB3
 
 # Diagnostic log next to this script (media.log).
-$LogFile = Join-Path $PSScriptRoot 'media.log'
+# Log goes to the app's data folder when given (installed and Store builds can't write next to the script).
+if ($LogPath) { $LogFile = $LogPath } else { $LogFile = Join-Path $PSScriptRoot 'media.log' }
 function Log($m) {
-  try { Add-Content -LiteralPath $LogFile -Value ((Get-Date -Format 'HH:mm:ss') + ' ' + $m) } catch { }
+  try { Add-Content -LiteralPath $LogFile -Encoding UTF8 -Value ((Get-Date -Format 'HH:mm:ss') + ' ' + $m) } catch { }
 }
 Log '--- media bridge started ---'
 
@@ -75,6 +76,7 @@ function Get-Thumb($p) {
 
 
 # Foreground window detection (to hide the island in browsers and fullscreen apps).
+Add-Type -Namespace IslandMem -Name Ws -MemberDefinition '[DllImport("psapi.dll")] public static extern bool EmptyWorkingSet(IntPtr h);' -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition @"
 using System;
@@ -276,9 +278,20 @@ while ($true) {
   try { Check-Foreground } catch { }
   # Раз в ~10 c: если остров закрылся/упал — выходим сами (не висим в памяти); и чистим свою память.
   $memTick++
-  if ($memTick % 25 -eq 0) {
+  if ($memTick % 17 -eq 0) {
     if ($ParentPid -gt 0 -and -not (Get-Process -Id $ParentPid -ErrorAction SilentlyContinue)) { exit }
     [System.GC]::Collect()
   }
-  Start-Sleep -Milliseconds 400
+  # Raz v ~1.5 min: otdaem neispolzuemuyu pamyat obratno Windows (svoyu i processov ostrova).
+  if ($memTick % 150 -eq 0) {
+    try {
+      $me = Get-Process -Id $PID
+      [void][IslandMem.Ws]::EmptyWorkingSet($me.Handle)
+      if ($ParentPid -gt 0) {
+        $pn = (Get-Process -Id $ParentPid -ErrorAction Stop).ProcessName
+        foreach ($pp in @(Get-Process -Name $pn -ErrorAction SilentlyContinue)) { try { [void][IslandMem.Ws]::EmptyWorkingSet($pp.Handle) } catch { } }
+      }
+    } catch { }
+  }
+  Start-Sleep -Milliseconds 600
 }

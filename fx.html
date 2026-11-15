@@ -1,0 +1,204 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Island FX</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style></head>
+<body><canvas id="c"></canvas>
+<script>
+(function () {
+  'use strict';
+  var KIND = new URLSearchParams(location.search).get('kind') === 'top' ? 'top' : 'bottom';
+  var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  var S = null, playing = false, running = true, W = 0, H = 0, DPR = 1;
+
+  /* ---------- звук компьютера (loopback) ---------- */
+  var analyser = null, fdata = null, audioTried = false, level = 0;
+  function initAudio() {
+    if (audioTried) return; audioTried = true;
+    try {
+      navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }).then(function (st) {
+        st.getVideoTracks().forEach(function (t) { t.stop(); });
+        if (!st.getAudioTracks().length) return;
+        var ac = new AudioContext();
+        var src = ac.createMediaStreamSource(new MediaStream(st.getAudioTracks()));
+        analyser = ac.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.72;
+        src.connect(analyser);
+        fdata = new Uint8Array(analyser.frequencyBinCount);
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  // N полос в логарифмической шкале 35 Гц … 14 кГц, 0..1
+  var bands = [], bandsS = [];
+  function readBands(n, sens) {
+    if (bands.length !== n) { bands = new Array(n).fill(0); bandsS = new Array(n).fill(0); }
+    var gain = 0.6 + (sens / 100) * 1.6, sum = 0;
+    if (analyser) {
+      analyser.getByteFrequencyData(fdata);
+      var sr = 48000, binHz = sr / 2 / fdata.length;
+      for (var i = 0; i < n; i++) {
+        var f0 = 35 * Math.pow(14000 / 35, i / n), f1 = 35 * Math.pow(14000 / 35, (i + 1) / n);
+        var b0 = Math.max(1, Math.floor(f0 / binHz)), b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz));
+        var m = 0; for (var k = b0; k < b1 && k < fdata.length; k++) m = Math.max(m, fdata[k]);
+        var v = Math.min(1, Math.pow(m / 255, 1.6) * gain * (0.75 + i / n * 0.6));
+        bands[i] = v; sum += v;
+      }
+    } else {
+      // звук не получилось взять — мягкая «дыхательная» анимация, пока играет музыка
+      var tt = performance.now() / 1000;
+      for (var j = 0; j < n; j++) { bands[j] = playing ? (0.25 + 0.2 * Math.sin(tt * 3.1 + j * 0.45) * Math.sin(tt * 1.3 + j * 0.13)) * gain * 0.7 : 0; sum += bands[j]; }
+    }
+    for (var q = 0; q < n; q++) bandsS[q] += (bands[q] - bandsS[q]) * (bands[q] > bandsS[q] ? 0.55 : 0.18);
+    level += ((sum / n) - level) * 0.25;
+    return bandsS;
+  }
+
+  /* ---------- цвета ---------- */
+  function hexHsl(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return [120, 60, 45];
+    var r = parseInt(m[1].slice(0, 2), 16) / 255, g = parseInt(m[1].slice(2, 4), 16) / 255, b = parseInt(m[1].slice(4, 6), 16) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0;
+    if (mx !== mn) { var d = mx - mn; s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+      h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; }
+    return [h, s * 100, l * 100];
+  }
+  var GRASS = {
+    green:  function (j) { return [100 + j * 30, 55 + j * 15, 28 + j * 22]; },
+    autumn: function (j) { return [18 + j * 30, 70 + j * 15, 38 + j * 18]; },
+    sakura: function (j) { return [330 + j * 20, 60 + j * 20, 62 + j * 16]; },
+    ice:    function (j) { return [185 + j * 20, 55 + j * 20, 62 + j * 18]; },
+    neon:   function (j, t, x) { return [(x * 0.08 + t * 40) % 360, 90, 55 + j * 10]; }
+  };
+  var WAVE = {
+    neon:    function (p) { return [185 + p * 110, 95, 60]; },
+    rainbow: function (p, t) { return [(p * 300 + t * 50) % 360, 90, 58]; },
+    fire:    function (p) { return [p * 50, 100, 52]; },
+    ocean:   function (p) { return [200 - p * 40, 85, 55]; },
+    white:   function () { return [0, 0, 96]; }
+  };
+  function hsl(a, al) { return 'hsla(' + a[0].toFixed(0) + ',' + Math.min(100, a[1]).toFixed(0) + '%,' + Math.min(100, a[2]).toFixed(0) + '%,' + (al == null ? 1 : al) + ')'; }
+
+  /* ---------- трава ---------- */
+  var blades = [];
+  function makeGrass() {
+    blades = [];
+    if (!S) return;
+    var g = S.grass, step = g.density === 'low' ? 7 : g.density === 'high' ? 2.6 : 4.2;
+    var x = 0;
+    while (x < W) {
+      blades.push({ x: x + Math.random() * step, h: g.height * (0.45 + Math.random() * 0.55), w: 2 + Math.random() * 3,
+        j: Math.random(), ph: Math.random() * 6.28, st: 0.7 + Math.random() * 0.6 });
+      x += step * (0.6 + Math.random() * 0.8);
+    }
+    blades.sort(function (a, b) { return b.h - a.h; }); // длинные сзади, короткие спереди
+  }
+  function drawGrass(t) {
+    var g = S.grass, amp = g.wind === 'calm' ? 0.07 : g.wind === 'storm' ? 0.34 : 0.17, spd = g.wind === 'calm' ? 0.8 : g.wind === 'storm' ? 2.6 : 1.5;
+    var mus = g.music ? Math.min(1, level * 2.2) : 0;
+    var base = g.color === 'custom' ? hexHsl(g.custom) : null;
+    var gust = Math.sin(t * spd * 0.37) * 0.5 + Math.sin(t * spd * 0.11 + 1.3) * 0.5;
+    for (var i = 0; i < blades.length; i++) {
+      var b = blades[i];
+      var c = base ? [base[0] + (b.j - .5) * 24, base[1], base[2] * (0.7 + b.j * 0.55)] : (GRASS[g.color] || GRASS.green)(b.j, t, b.x);
+      var a = (Math.sin(t * spd * b.st + b.x * 0.012 + b.ph) * 0.6 + gust * 0.6) * amp + mus * 0.25 * Math.sin(t * 9 + b.ph);
+      var hh = b.h * (1 + mus * 0.28), bend = Math.sin(a) * hh, tipY = Math.cos(a) * hh;
+      ctx.beginPath();
+      ctx.moveTo(b.x - b.w, 0);
+      ctx.quadraticCurveTo(b.x - b.w * 0.3 + bend * 0.35, tipY * 0.55, b.x + bend, tipY);
+      ctx.quadraticCurveTo(b.x + b.w * 0.3 + bend * 0.35, tipY * 0.55, b.x + b.w, 0);
+      ctx.closePath();
+      var gr = ctx.createLinearGradient(0, 0, 0, tipY);
+      gr.addColorStop(0, hsl([c[0], c[1], c[2] * 0.55]));
+      gr.addColorStop(1, hsl([c[0], c[1], c[2] * 1.15]));
+      ctx.fillStyle = gr; ctx.fill();
+    }
+  }
+
+  /* ---------- волна ---------- */
+  function waveColor(p, t) {
+    var w = S.wave;
+    if (w.palette === 'custom') { var c = hexHsl(w.custom); return [c[0] + (p - .5) * 30, c[1], c[2]]; }
+    return (WAVE[w.palette] || WAVE.neon)(p, t);
+  }
+  function drawWave(t) {
+    var w = S.wave, n = w.style === 'bars' ? 72 : 48;
+    var v = readBands(n, w.sens), maxH = w.height, baseY = H - 2;
+    var grad = ctx.createLinearGradient(0, 0, W, 0);
+    for (var s = 0; s <= 6; s++) grad.addColorStop(s / 6, hsl(waveColor(s / 6, t)));
+    if (w.style === 'bars') {
+      var bw = W / n, gap = Math.max(1, bw * 0.28);
+      ctx.fillStyle = grad; ctx.shadowColor = hsl(waveColor(.5, t), .8); ctx.shadowBlur = 12;
+      for (var i = 0; i < n; i++) {
+        var idx = i < n / 2 ? n / 2 - 1 - i : i - n / 2; // низкие частоты — в центре
+        var h = Math.max(2, v[idx * 2 % n] * maxH);
+        var x = i * bw + gap / 2, ww = bw - gap, r = Math.min(ww / 2, 4);
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(x, baseY - h, ww, h, [r, r, 0, 0]); else ctx.rect(x, baseY - h, ww, h);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      return;
+    }
+    // плавная кривая: зеркально от центра, плюс лёгкая «бегущая» волна, чтобы не стояла на месте
+    var pts = [], m = 64;
+    for (var k = 0; k <= m; k++) {
+      var p = k / m, d = Math.abs(p - 0.5) * 2, bi = Math.min(n - 1, Math.floor(d * (n - 1)));
+      var amp = v[bi] * maxH;
+      var run = (Math.sin(p * 18 - t * 3.2) * 0.5 + 0.5) * (4 + level * maxH * 0.25);
+      pts.push([p * W, baseY - Math.max(1.5, amp * (0.85 + 0.15 * Math.sin(p * 9 + t * 2)) + run)]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (var z = 1; z < pts.length - 1; z++) {
+      var mx = (pts[z][0] + pts[z + 1][0]) / 2, my = (pts[z][1] + pts[z + 1][1]) / 2;
+      ctx.quadraticCurveTo(pts[z][0], pts[z][1], mx, my);
+    }
+    ctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+    if (w.style === 'line') {
+      ctx.strokeStyle = grad; ctx.lineWidth = 3; ctx.shadowColor = hsl(waveColor(.5, t), .9); ctx.shadowBlur = 14; ctx.stroke(); ctx.shadowBlur = 0;
+      return;
+    }
+    ctx.save();
+    ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
+    var fill = ctx.createLinearGradient(0, baseY - maxH, 0, H);
+    ctx.globalAlpha = 0.55; ctx.fillStyle = grad; ctx.fill();
+    ctx.globalAlpha = 1; ctx.restore();
+    // светящаяся кромка сверху
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (var y = 1; y < pts.length - 1; y++) { ctx.quadraticCurveTo(pts[y][0], pts[y][1], (pts[y][0] + pts[y + 1][0]) / 2, (pts[y][1] + pts[y + 1][1]) / 2); }
+    ctx.strokeStyle = grad; ctx.lineWidth = 2.2; ctx.shadowColor = hsl(waveColor(.5, t), .9); ctx.shadowBlur = 12; ctx.stroke(); ctx.shadowBlur = 0;
+  }
+
+  /* ---------- цикл ---------- */
+  function resize() {
+    DPR = window.devicePixelRatio || 1; W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (KIND === 'top') makeGrass();
+  }
+  window.addEventListener('resize', resize);
+  var last = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!S || !running) return;
+    if (KIND === 'top' && now - last < 30) return; // траве хватает ~30 кадров/с
+    last = now;
+    var t = now / 1000;
+    ctx.clearRect(0, 0, W, H);
+    if (KIND === 'top') { if (S.grass.music) readBands(32, 60); drawGrass(t); }
+    else drawWave(t);
+  }
+  requestAnimationFrame(frame);
+  window.fx.onSettings(function (s) {
+    var hc = !S || (KIND === 'top' && (S.grass.height !== s.grass.height || S.grass.density !== s.grass.density));
+    S = s;
+    if (KIND === 'bottom' || s.grass.music) initAudio();
+    if (hc) resize();
+  });
+  window.fx.onMedia(function (p) { playing = !!p; });
+  window.fx.onRun(function (on) { running = !!on; if (!on) ctx.clearRect(0, 0, W, H); });
+  resize();
+  window.fx.ready();
+})();
+</script>
+</body></html>

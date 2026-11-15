@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell, net, dialog, nativeImage, desktopCapturer, Tray, Menu, powerMonitor, clipboard } = require('electron');
+const { app, BrowserWindow, globalShortcut, screen, ipcMain, shell, net, dialog, nativeImage, desktopCapturer, Tray, Menu, powerMonitor, clipboard, session } = require('electron');
 // Экономия памяти: V8 в режиме «поменьше памяти» и без запасного процесса рендерера про запас.
 app.commandLine.appendSwitch('js-flags', '--optimize-for-size');
 app.commandLine.appendSwitch('disable-features', 'SpareRendererForSitePerProcess');
@@ -34,7 +34,11 @@ function log(m) {
 process.on('uncaughtException', (e) => { try { fs.appendFileSync(LOG, new Date().toLocaleTimeString('ru-RU') + ' UNCAUGHT: ' + (e && e.stack || e) + '\n'); } catch (x) {} });
 process.on('unhandledRejection', (e) => { try { fs.appendFileSync(LOG, new Date().toLocaleTimeString('ru-RU') + ' UNHANDLED: ' + (e && e.stack || e) + '\n'); } catch (x) {} });
 let lastKey = '';
-const CMD_FILE = path.join(os.tmpdir(), 'dynamic-island-media-cmd.txt');
+// Файл команд для моста музыки — в папке данных, а не во временной папке Windows: при русском имени
+// пользователя TEMP бывает записан коротким именем (C:\\Users\\12C2~1\\…), которое PowerShell не открывает,
+// и кнопки «пауза/следующий трек» переставали работать.
+const DATA_DIR_LONG = (() => { try { return fs.realpathSync.native(DATA_DIR); } catch (e) { return DATA_DIR; } })(); // 8.3 → полный путь
+const CMD_FILE = path.join(DATA_DIR_LONG, 'media-cmd.txt');
 
 // Повторный запуск (например, start.bat) закрывает старый остров и стартует заново.
 const gotLock = app.requestSingleInstanceLock();
@@ -56,6 +60,10 @@ if (!gotLock) {
 const BROWSERS = ['chrome', 'msedge', 'firefox', 'opera', 'opera_gx', 'brave', 'vivaldi', 'browser', 'iexplore', 'arc', 'zen', 'librewolf', 'waterfox', 'tor'];
 let extraHide = [];
 let autoHide = true;
+// Режим игры: в игре остров показывает FPS, нагрузку ПК и время в игре.
+let gameMode = false;      // включён ли режим игры
+let gameAutoHide = true;   // прятать ли остров в играх (если режим игры выключен)
+let gameSkin = 'red';      // дизайн в игре: red | default | neon
 let notifOn = true; // показывать сообщения Discord/Telegram в острове
 let LANG = 'ru'; // 'ru' | 'en' — текущий язык интерфейса
 let langChosen = false; // true, если язык уже был выбран (ключ lang есть в settings.json)
@@ -66,11 +74,14 @@ try {
   if (st.autoHide === false) autoHide = false;
   if (st.notifOn === false) notifOn = false;
   if (st.lang === 'en' || st.lang === 'ru') { LANG = st.lang; langChosen = true; }
+  if (st.gameMode === true) gameMode = true;
+  if (typeof st.gameAutoHide === 'boolean') gameAutoHide = st.gameAutoHide; else if (st.autoHide === false) gameAutoHide = false;
+  if (['red', 'default', 'neon'].indexOf(st.gameSkin) >= 0) gameSkin = st.gameSkin;
 } catch (e) {}
 // Словарь строк хост-процесса (трей, диалоги, приветствие) — переводится на английский по LANG.
 const STR = {
   ru: {
-    fullscreen: 'полный экран', browser: 'браузер', manually: 'вручную',
+    fullscreen: 'полный экран', game: 'игра', browser: 'браузер', manually: 'вручную',
     hideHint: 'Ctrl+Alt+H — скрыть остров',
     hiddenHintPrefix: 'Остров скрыт (', hiddenHintSuffix: ')  ·  Ctrl+Alt+S — показать',
     morning: 'Доброе утро', afternoon: 'Добрый день', evening: 'Добрый вечер', night: 'Доброй ночи',
@@ -84,7 +95,7 @@ const STR = {
     shotSaveTitle: 'Сохранить скриншот', pngFilter: 'Изображение PNG', shotCopied: 'Скриншот скопирован — вставляй Ctrl+V', shotSaved: 'Скриншот сохранён'
   },
   en: {
-    fullscreen: 'fullscreen', browser: 'browser', manually: 'manually',
+    fullscreen: 'fullscreen', game: 'game', browser: 'browser', manually: 'manually',
     hideHint: 'Ctrl+Alt+H — hide the island',
     hiddenHintPrefix: 'Island hidden (', hiddenHintSuffix: ')  ·  Ctrl+Alt+S — show',
     morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening', night: 'Good night',
@@ -117,13 +128,135 @@ function setAutoHide(on) {
   if (!autoHide && override === 'hide') override = null; // ручное скрытие не снимаем, только автоматику
   applyVisibility(false);
 }
-let fg = { proc: '', full: false };
+let fg = { proc: '', full: false, path: '' };
+
+// ---- Режим игры ----
+// Игра = полноэкранное окно (не браузер и не видеоплеер) или exe из папки игр (Steam, Epic, Riot…), даже в окне.
+const GAME_PATH_RE = /\\steamapps\\common\\|\\epic games\\|\\riot games\\|\\ubisoft game launcher\\games\\|\\battle\.net\\|\\gog galaxy\\games\\|\\xboxgames\\|\\ea games\\|\\origin games\\|\\games\\/i;
+const NOT_GAMES = ['explorer', 'applicationframehost', 'vlc', 'mpc-hc64', 'mpc-hc', 'mpc-be64', 'mpc-be', 'potplayermini64', 'potplayermini', 'wmplayer', 'video.ui', 'microsoft.media.player', 'powerpnt', 'obs64', 'obs32', 'photos', 'microsoft.photos', 'mspaint', 'code', 'devenv', 'discord', 'telegram', 'steam', 'steamwebhelper', 'epicgameslauncher', 'riotclientux', 'zoom', 'teams', 'ms-teams', 'lockapp', 'searchhost', 'startmenuexperiencehost', 'shellexperiencehost', 'textinputhost', 'taskmgr', 'winword', 'excel', 'acrobat', 'acrord32', 'mstsc', 'vmware', 'virtualboxvm', 'snippingtool', 'screenclippinghost', 'screensketch', 'sharex', 'lightshot', 'nvidia overlay', 'gamebar', 'xboxgamebar', 'claude'];
+function isGameFg(f) {
+  if (!f || !f.proc) return false;
+  if (BROWSERS.indexOf(f.proc) >= 0 || NOT_GAMES.indexOf(f.proc) >= 0 || SELF_PROCS.indexOf(f.proc) >= 0) return false;
+  if (GAME_PATH_RE.test(f.path || '')) return true;
+  return !!f.full;
+}
+function gameName(f) {
+  const p = String(f.path || '');
+  const m = /\\(?:steamapps\\common|epic games|riot games|xboxgames|ea games|gog galaxy\\games)\\([^\\]+)/i.exec(p);
+  let n = m ? m[1] : (f.proc || '');
+  n = n.replace(/[_-]+/g, ' ').trim();
+  return n ? n.charAt(0).toUpperCase() + n.slice(1) : 'Game';
+}
+function saveSetting(key, val) {
+  let st = {};
+  try { st = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) || {}; } catch (e) {}
+  st[key] = val;
+  try { fs.writeFileSync(SETTINGS_FILE, JSON.stringify(st, null, 1)); } catch (e) { log('settings save error: ' + e.message); }
+}
+// Время в играх за сегодня: { day, games: { proc: секунды } }
+const GAME_FILE = dataPath('game-time.json');
+const dayKey = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+let gameTime = (() => { try { return JSON.parse(fs.readFileSync(GAME_FILE, 'utf8')); } catch (e) { return null; } })() || { day: dayKey(), games: {}, names: {} };
+if (!gameTime.games) gameTime.games = {};
+if (!gameTime.names) gameTime.names = {};
+function gameRoll() { const k = dayKey(); if (gameTime.day !== k) gameTime = { day: k, games: {}, names: {} }; }
+function saveGameTime() { try { fs.writeFileSync(GAME_FILE, JSON.stringify(gameTime)); } catch (e) {} }
+let gameCur = null;        // текущая игровая сессия { proc, name, acc (мс в игре), left (когда свернул) }
+let gameTickLast = Date.now(), gameSaveAt = 0, gameWasActive = false;
+let gameStats = { gpu: -1, fps: -1 };
+let gps = null;            // PowerShell-мост gamestats.ps1 (GPU и FPS), живёт только пока идёт игра
+let gPrev = null;
+function gameCpu() {
+  let idle = 0, total = 0;
+  os.cpus().forEach((c) => { const t = c.times; idle += t.idle; total += t.user + t.nice + t.sys + t.idle + t.irq; });
+  let cpu = 0;
+  if (gPrev && total > gPrev.total) cpu = Math.round((1 - (idle - gPrev.idle) / (total - gPrev.total)) * 100);
+  gPrev = { idle, total };
+  return Math.max(0, Math.min(100, cpu));
+}
+function startGameBridge() {
+  if (gps || process.platform !== 'win32') return;
+  try {
+    gps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', resPath('gamestats.ps1'), '-ParentPid', String(process.pid)], { windowsHide: true });
+  } catch (e) { log('game bridge spawn error: ' + e.message); gps = null; return; }
+  log('game bridge started');
+  let b = '';
+  gps.stdout.setEncoding('utf8');
+  gps.stdout.on('data', (c) => {
+    b += c; let i;
+    while ((i = b.indexOf('\n')) >= 0) {
+      const line = b.slice(0, i).trim(); b = b.slice(i + 1);
+      if (line[0] !== '{') continue;
+      try { const d = JSON.parse(line); gameStats = { gpu: Number(d.gpu), fps: Number(d.fps) }; } catch (e) {}
+    }
+  });
+  gps.stderr.on('data', (c) => log('game bridge stderr: ' + String(c).slice(0, 300)));
+  gps.on('error', () => { gps = null; });
+  gps.on('exit', () => { gps = null; });
+}
+function stopGameBridge() {
+  if (gps) { try { gps.kill(); } catch (e) {} gps = null; log('game bridge stopped'); }
+  gameStats = { gpu: -1, fps: -1 };
+}
+function gameSummary() {
+  gameRoll();
+  return Object.keys(gameTime.games).map((k) => ({ name: gameTime.names[k] || k, sec: Math.floor(gameTime.games[k]) }))
+    .filter((x) => x.sec >= 60).sort((a, b) => b.sec - a.sec).slice(0, 6);
+}
+function gameTick() {
+  const now = Date.now(), dt = Math.min(5000, Math.max(0, now - gameTickLast));
+  gameTickLast = now;
+  const inGame = isGameFg(fg);
+  if (inGame) {
+    if (!gameCur || gameCur.proc !== fg.proc) gameCur = { proc: fg.proc, name: gameName(fg), acc: 0, left: 0 };
+    gameCur.left = 0; gameCur.acc += dt;
+    gameRoll();
+    gameTime.games[fg.proc] = (gameTime.games[fg.proc] || 0) + dt / 1000;
+    gameTime.names[fg.proc] = gameCur.name;
+    if (now - gameSaveAt > 30000) { gameSaveAt = now; saveGameTime(); }
+  } else if (gameCur) {
+    if (!gameCur.left) { gameCur.left = now; saveGameTime(); }
+    else if (now - gameCur.left > 5 * 60 * 1000) gameCur = null; // вышел из игры больше 5 минут назад — сессия закончилась
+  }
+  const active = gameMode && inGame;
+  if (active) startGameBridge();
+  else if (gps && (!gameMode || !gameCur || now - gameCur.left > 30000)) stopGameBridge();
+  if (!win || win.isDestroyed()) return;
+  if (active) {
+    // некоторые игры в режиме «без рамки» сами встают поверх всего — раз в 3 сек поднимаем остров обратно
+    if (visible && (gameCur.acc % 3000) < 1000) { try { win.setAlwaysOnTop(true, 'screen-saver'); win.moveTop(); } catch (e) {} }
+    const tm = os.totalmem(), fm = os.freemem();
+    win.webContents.send('game', {
+      active: true, name: gameCur.name, cpu: gameCpu(), ram: Math.round((tm - fm) / tm * 100),
+      gpu: gameStats.gpu, fps: gameStats.fps, sess: Math.floor(gameCur.acc / 1000),
+      today: Math.floor(gameTime.games[fg.proc] || 0)
+    });
+    if (!gameWasActive) { try { log('game on: ' + gameCur.name + ' full=' + fg.full + ' visible=' + visible + ' winVisible=' + win.isVisible() + ' onTop=' + win.isAlwaysOnTop() + ' bounds=' + JSON.stringify(win.getBounds())); } catch (e) {} }
+    gameWasActive = true;
+  } else if (gameWasActive) {
+    log('game off');
+    gameWasActive = false;
+    win.webContents.send('game', { active: false });
+  }
+}
+setInterval(gameTick, 1000);
+function gameSettings() { return { gameMode, gameAutoHide, gameSkin, today: gameSummary(), playing: gameCur && !gameCur.left ? gameCur.name : '' }; }
+function setGame(patch) {
+  patch = patch || {};
+  if (typeof patch.gameMode === 'boolean') { gameMode = patch.gameMode; saveSetting('gameMode', gameMode); if (!gameMode) stopGameBridge(); }
+  if (typeof patch.gameAutoHide === 'boolean') { gameAutoHide = patch.gameAutoHide; saveSetting('gameAutoHide', gameAutoHide); }
+  if (['red', 'default', 'neon'].indexOf(patch.gameSkin) >= 0) { gameSkin = patch.gameSkin; saveSetting('gameSkin', gameSkin); }
+  applyVisibility(false);
+  return gameSettings();
+}
 let mediaPlaying = false; // играет ли сейчас трек (в т.ч. в браузере)
 let override = null; // 'show' | 'hide' | null
 let visible = true;
 let hideTimer = null;
 
 function hideReason() {
+  // Игры — отдельная настройка «Автоскрытие в играх»; в режиме игры остров в игре не прячется.
+  if (isGameFg(fg)) return (gameAutoHide && !gameMode) ? L('game') : '';
   if (!autoHide) return '';
   if (fg.full) return L('fullscreen');
   if (BROWSERS.indexOf(fg.proc) >= 0 && !mediaPlaying) return L('browser');
@@ -150,6 +283,7 @@ function applyVisibility(byUser) {
     hideTimer = setTimeout(() => { if (!visible && win && !win.isDestroyed()) win.hide(); }, 6000);
   }
   log('visible=' + visible + ' override=' + override + ' fg=' + fg.proc + ' full=' + fg.full);
+  try { fxApply(); } catch (e) {}
 }
 function handleFg(d) {
   const proc = String(d.proc || '');
@@ -158,8 +292,10 @@ function handleFg(d) {
   setTimeout(() => captureBlur(false), 300);
   if (focus) { focusAccrue(); focus.cur = proc; }
   if (proc !== fg.proc && override === 'show') override = null;
-  fg = { proc, full: !!d.full };
+  fg = { proc, full: !!d.full, path: String(d.path || '') };
   applyVisibility(false);
+  if (customSettings.position === 'bottom') raiseOverTaskbar();
+  try { fxApply(); } catch (e) {}
 }
 
 // ---- «Не беспокоить»: уведомления Windows + учёт времени в приложениях ----
@@ -389,7 +525,7 @@ function aumidFromLnk(p) {
 }
 function shellIcon(parse) {
   return new Promise((resolve) => {
-    const out = path.join(os.tmpdir(), 'dynamic-island-icon-' + Math.random().toString(36).slice(2) + '.png');
+    const out = dataPath('icon-' + Math.random().toString(36).slice(2) + '.png'); // не во временной папке — см. CMD_FILE
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', resPath('icon.ps1'), '-Parse', parse, '-Out', out],
       { windowsHide: true, timeout: 20000 }, (err, stdout) => {
         log('icon.ps1 ' + parse + ' -> ' + String(stdout || '').trim().slice(0, 120) + (err ? ' err=' + err.message : ''));
@@ -510,7 +646,7 @@ ipcMain.handle('design-image-clear', () => { try { fs.unlinkSync(BG_FILE); } cat
 
 // ---- Кастомизация (позиция и размер острова, своё приветствие, порядок вкладок) ----
 const CUSTOM_FILE = dataPath('custom.json');
-const TABS_ALL = ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'design', 'custom'];
+const TABS_ALL = ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'game', 'design', 'custom'];
 // Виджеты внутри вкладки «Главная» — единственная вкладка с несколькими независимыми блоками,
 // поэтому именно для неё даём порядок/видимость (остальные вкладки — один сплошной экран).
 const HOME_WIDGETS_ALL = ['clock', 'app', 'media'];
@@ -519,7 +655,7 @@ const HOME_WIDGETS_ALL = ['clock', 'app', 'media'];
 const SIZE_SCALE = { small: 0.85, medium: 1, large: 1.15 };
 function cleanCustom(d) {
   d = d || {};
-  const position = ['center', 'left', 'right', 'custom'].indexOf(d.position) >= 0 ? d.position : 'center';
+  const position = ['center', 'left', 'right', 'custom', 'bottom'].indexOf(d.position) >= 0 ? d.position : 'center';
   const size = ['small', 'medium', 'large'].indexOf(d.size) >= 0 ? d.size : 'medium';
   const greeting = String(d.greeting || '').slice(0, 60);
   const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v) : null);
@@ -553,6 +689,12 @@ function computeIslandBounds(b, cs) {
     x = cs.position === 'left' ? b.x : b.x + b.width - dims.w;
     y = cs.posY !== null ? clampY(cs.posY) : clampY(Math.round(b.y + (b.height - dims.h) / 2));
   }
+  else if (cs.position === 'bottom') {
+    // На панели задач: окно прижато к самому низу экрана, остров рисуется снизу и раскрывается вверх.
+    // По горизонтали — где отпустили; по умолчанию — в пустой левой части панели (иконки Windows 11 по центру).
+    x = cs.posX !== null ? clampX(cs.posX) : clampX(Math.round(b.x + b.width * 0.25 - dims.w / 2));
+    y = b.y + b.height - dims.h;
+  }
   else { x = Math.round(b.x + (b.width - dims.w) / 2); y = b.y; }
   return { x, y, width: dims.w, height: dims.h };
 }
@@ -584,6 +726,7 @@ ipcMain.handle('custom-reset', () => {
 const DRAG_W = 130, DRAG_H = 40; // физический размер окна во время перетаскивания, px
 // Зона «прилипания» у края экрана — доля ширины экрана, а не фикс. пиксели: на любом разрешении
 // отпустить острова «примерно у края» (а не прямо впритык до пикселя) должно хватать, чтобы прилип.
+const BOTTOM_SNAP = 70; // отпустили ближе 70px к низу экрана — остров встаёт на панель задач
 function dockSnapPx(screenWidth) { return Math.max(130, Math.min(220, Math.round(screenWidth * 0.08))); }
 ipcMain.on('custom-drag-start', (_e, sx, sy) => {
   if (!win || win.isDestroyed()) return;
@@ -605,7 +748,8 @@ ipcMain.handle('custom-drag-move', (_e, dx, dy) => {
   win.setPosition(nx, ny);
   const snap = dockSnapPx(b.width);
   let near = null;
-  if (nx - b.x <= snap) near = 'left';
+  if ((b.y + b.height) - (ny + wb.height) <= BOTTOM_SNAP) near = 'bottom';
+  else if (nx - b.x <= snap) near = 'left';
   else if ((b.x + b.width) - (nx + wb.width) <= snap) near = 'right';
   return { near };
 });
@@ -614,17 +758,195 @@ ipcMain.handle('custom-drag-end', () => {
     const b = screen.getPrimaryDisplay().bounds, wb = win.getBounds();
     const SNAP = dockSnapPx(b.width); // «магнитная» зона у края экрана — та же, что подсвечивалась во время перетаскивания
     let position = 'custom';
-    if (wb.x - b.x <= SNAP) position = 'left';
+    if ((b.y + b.height) - (wb.y + wb.height) <= BOTTOM_SNAP) position = 'bottom';
+    else if (wb.x - b.x <= SNAP) position = 'left';
     else if ((b.x + b.width) - (wb.x + wb.width) <= SNAP) position = 'right';
     log('drag-end wb=' + JSON.stringify(wb) + ' screen=' + JSON.stringify(b) + ' snap=' + SNAP + ' -> position=' + position);
     // У стены: ставим окно так, чтобы середина вертикальной полоски (top 36px, высота 200px) оказалась там, где отпустили.
     const posY = position === 'custom' ? wb.y : Math.round(wb.y + wb.height / 2 - 136);
-    customSettings = cleanCustom(Object.assign({}, customSettings, { position, posX: wb.x, posY }));
+    // На панели задач центр острова — там, где отпустили.
+    const posX = position === 'bottom' ? Math.round(wb.x + wb.width / 2 - islandDims(customSettings.size).w / 2) : wb.x;
+    customSettings = cleanCustom(Object.assign({}, customSettings, { position, posX, posY }));
     try { fs.writeFileSync(CUSTOM_FILE, JSON.stringify(customSettings, null, 1)); } catch (e) { log('custom save error: ' + e.message); }
     applyCustomBounds(); // возвращаем окно к настоящему размеру острова в итоговой (возможно прилипшей) позиции
   }
   return customSettings;
 });
+// ---- Загрузки из браузера: кружок возле часов в острове ----
+// Браузеры качают во временный файл (.crdownload — Chrome/Edge/Яндекс/Opera GX, .part — Firefox, .opdownload — Opera),
+// а в конце переименовывают его в нормальное имя. Следим за папкой «Загрузки»: пока такие файлы растут — идёт загрузка.
+// Общий размер файла браузер в них не пишет, поэтому видно сколько уже скачано и скорость, но не проценты.
+const DL_EXT = /\.(crdownload|part|opdownload|partial)$/i;
+let dlDir = '';
+try { dlDir = app.getPath('downloads'); } catch (e) {}
+const dlTrack = {};          // имя файла -> { size, first, lastGrow, grows, speed, temp }
+const dlPending = new Set();  // имена, про которые Windows сообщила «что-то изменилось»
+let dlTimer = null, dlWasActive = false;
+function dlSend(ch, d) { if (win && !win.isDestroyed()) win.webContents.send(ch, d); }
+function dlDone(name) {
+  const fp = path.join(dlDir, name);
+  if (fs.existsSync(fp)) { dlSend('dl-done', { name, path: fp }); log('download done: ' + name); }
+}
+// Загрузка = временный файл браузера (.crdownload/.part/...) ИЛИ любой файл в «Загрузках», который прямо сейчас растёт
+// (некоторые браузеры, в т.ч. Яндекс в части случаев, пишут сразу в итоговый файл).
+function dlScan() {
+  dlTimer = null;
+  if (!dlDir) return;
+  const now = Date.now();
+  const names = new Set([...dlPending, ...Object.keys(dlTrack)]);
+  dlPending.clear();
+  names.forEach((n) => {
+    if (!n) return;
+    let st = null;
+    try { st = fs.statSync(path.join(dlDir, n)); } catch (e) {}
+    const tr = dlTrack[n];
+    if (!st || !st.isFile()) {
+      if (tr) {
+        delete dlTrack[n];
+        if (tr.temp) { const fin = n.replace(DL_EXT, ''); if (!/^unconfirmed \d+/i.test(fin)) dlDone(fin); }
+      }
+      return;
+    }
+    const temp = DL_EXT.test(n);
+    if (!tr) {
+      if (!temp && now - st.mtimeMs > 15000) return; // старый файл просто переименовали/потрогали — не загрузка
+      dlTrack[n] = { size: st.size, first: now, lastGrow: temp ? now : 0, grows: 0, speed: 0, temp, t: now };
+      if (temp) log('download started: ' + n + ' in ' + dlDir);
+      return;
+    }
+    if (st.size > tr.size) {
+      const sp = (st.size - tr.size) / Math.max(0.2, (now - tr.t) / 1000);
+      tr.speed = tr.speed ? tr.speed * 0.6 + sp * 0.4 : sp; tr.lastGrow = now; tr.grows++;
+      if (!tr.temp && tr.grows === 2) log('download (growing file): ' + n);
+    }
+    tr.size = st.size; tr.t = now;
+    if (!tr.temp && tr.grows >= 2 && now - tr.lastGrow > 4000) { delete dlTrack[n]; dlDone(n); return; } // перестал расти — докачался
+    if (!tr.temp && tr.grows < 2 && now - tr.first > 10000) { delete dlTrack[n]; return; }
+    if (tr.temp && now - st.mtimeMs > 120000) { delete dlTrack[n]; } // брошенная недокачка
+  });
+  const act = [];
+  Object.keys(dlTrack).forEach((n) => {
+    const tr = dlTrack[n];
+    if (!(tr.temp || tr.grows >= 2)) return;
+    const nm = n.replace(DL_EXT, '');
+    act.push({ name: /^unconfirmed \d+(\.\w+)?$/i.test(nm) ? '' : nm, size: tr.size, speed: now - tr.lastGrow < 3000 ? Math.round(tr.speed) : 0 });
+  });
+  if (act.length || dlWasActive) dlSend('dl', { items: act });
+  dlWasActive = act.length > 0;
+  if (Object.keys(dlTrack).length || dlPending.size) dlTimer = setTimeout(dlScan, 1000);
+}
+function dlKick() { if (!dlTimer) dlTimer = setTimeout(dlScan, 300); }
+function dlWatch() {
+  if (!dlDir) return;
+  log('downloads folder: ' + dlDir);
+  try { fs.watch(dlDir, { persistent: false }, (_ev, fn) => { if (fn) dlPending.add(String(fn)); dlKick(); }); }
+  catch (e) { log('downloads watch error: ' + e.message); }
+  // уже идущие загрузки на момент запуска
+  try { fs.readdirSync(dlDir).forEach((n) => { if (DL_EXT.test(n)) dlPending.add(n); }); } catch (e) {}
+  dlKick();
+}
+ipcMain.on('dl-open', (_e, p) => {
+  p = String(p || '');
+  if (dlDir && path.dirname(p) === dlDir && fs.existsSync(p)) shell.showItemInFolder(p);
+});
+
+// ---- Эффекты экрана: трава вдоль верхнего края и волна под музыку внизу ----
+// Два отдельных прозрачных окна-полоски (сквозь них проходят клики), создаются только когда эффект включён.
+const FX_FILE = dataPath('fx.json');
+const FX_GRASS_COLORS = ['green', 'autumn', 'sakura', 'ice', 'neon', 'custom'];
+const FX_WAVE_PALETTES = ['neon', 'rainbow', 'fire', 'ocean', 'white', 'custom'];
+function cleanFx(d) {
+  d = d || {}; const g = d.grass || {}, w = d.wave || {};
+  const hex = (v, def) => (/^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : def);
+  const num = (v, a, b, def) => (typeof v === 'number' && isFinite(v) ? Math.max(a, Math.min(b, Math.round(v))) : def);
+  return {
+    grass: {
+      on: g.on === true,
+      color: FX_GRASS_COLORS.indexOf(g.color) >= 0 ? g.color : 'green',
+      custom: hex(g.custom, '#5fd35f'),
+      wind: ['calm', 'breeze', 'storm'].indexOf(g.wind) >= 0 ? g.wind : 'breeze',
+      height: num(g.height, 20, 90, 44),
+      density: ['low', 'mid', 'high'].indexOf(g.density) >= 0 ? g.density : 'mid',
+      music: g.music !== false
+    },
+    wave: {
+      on: w.on === true,
+      style: ['wave', 'line', 'bars'].indexOf(w.style) >= 0 ? w.style : 'wave',
+      palette: FX_WAVE_PALETTES.indexOf(w.palette) >= 0 ? w.palette : 'neon',
+      custom: hex(w.custom, '#4ea1ff'),
+      height: num(w.height, 30, 160, 70),
+      sens: num(w.sens, 0, 100, 60)
+    }
+  };
+}
+let fxSettings = cleanFx((() => { try { return JSON.parse(fs.readFileSync(FX_FILE, 'utf8')); } catch (e) { return null; } })());
+const fxWins = { top: null, bottom: null };
+function fxBounds(kind) {
+  const wa = screen.getPrimaryDisplay().workArea;
+  if (kind === 'top') { const h = Math.round(fxSettings.grass.height * 1.35) + 6; return { x: wa.x, y: wa.y, width: wa.width, height: h }; }
+  const h = fxSettings.wave.height + 24;
+  return { x: wa.x, y: wa.y + wa.height - h, width: wa.width, height: h };
+}
+function fxCreate(kind) {
+  const w = new BrowserWindow(Object.assign(fxBounds(kind), {
+    frame: false, transparent: true, resizable: false, movable: false, focusable: false, hasShadow: false,
+    skipTaskbar: true, alwaysOnTop: true, show: false, backgroundColor: '#00000000',
+    webPreferences: { preload: path.join(__dirname, 'fx-preload.js'), contextIsolation: true, nodeIntegration: false,
+      backgroundThrottling: false, spellcheck: false, autoplayPolicy: 'no-user-gesture-required' }
+  }));
+  w.setIgnoreMouseEvents(true);
+  w.setAlwaysOnTop(true, 'floating');
+  w.setVisibleOnAllWorkspaces(true);
+  w.loadFile('fx.html', { query: { kind } });
+  w.on('closed', () => { if (fxWins[kind] === w) fxWins[kind] = null; });
+  fxWins[kind] = w;
+  return w;
+}
+// Эффекты прячутся в играх и полноэкранных окнах и вместе со скрытым островом.
+function fxApply() {
+  // Трава и волна теперь рисуются прямо внутри острова (index.html), отдельные окна-полоски не нужны.
+  ['top', 'bottom'].forEach((k) => { const w = fxWins[k]; if (w && !w.isDestroyed()) w.destroy(); fxWins[k] = null; });
+  if (win && !win.isDestroyed()) win.webContents.send('fx-media', mediaPlaying);
+  return;
+  // eslint-disable-next-line no-unreachable
+  const allowed = visible && !fg.full && !isGameFg(fg);
+  ['top', 'bottom'].forEach((kind) => {
+    const on = kind === 'top' ? fxSettings.grass.on : fxSettings.wave.on;
+    let w = fxWins[kind];
+    if (!on) { if (w && !w.isDestroyed()) { w.destroy(); fxWins[kind] = null; } return; }
+    if (!w || w.isDestroyed()) w = fxCreate(kind);
+    try { w.setBounds(fxBounds(kind)); } catch (e) {}
+    w.webContents.send('fx-settings', fxSettings);
+    w.webContents.send('fx-media', mediaPlaying);
+    w.webContents.send('fx-run', allowed);
+    if (allowed) { if (!w.isVisible()) w.showInactive(); } else if (w.isVisible()) w.hide();
+  });
+}
+ipcMain.on('fx-ready', (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w) return;
+  w.webContents.send('fx-settings', fxSettings);
+  w.webContents.send('fx-media', mediaPlaying);
+  const allowed = visible && !fg.full && !isGameFg(fg);
+  w.webContents.send('fx-run', allowed);
+  if (allowed) w.showInactive();
+});
+ipcMain.handle('fx-get', () => fxSettings);
+ipcMain.handle('fx-set', (_e, d) => {
+  fxSettings = cleanFx(Object.assign({}, fxSettings, d, { grass: Object.assign({}, fxSettings.grass, d && d.grass), wave: Object.assign({}, fxSettings.wave, d && d.wave) }));
+  try { fs.writeFileSync(FX_FILE, JSON.stringify(fxSettings, null, 1)); } catch (e) { log('fx save error: ' + e.message); }
+  fxApply();
+  return fxSettings;
+});
+try { screen.on('display-metrics-changed', () => fxApply()); } catch (e) {}
+
+// На панели задач: панель Windows сама «всегда сверху», и после клика по ней встаёт над островом.
+// Поэтому в режиме «Снизу» сразу после смены активного окна и дальше раз в ~0.7 сек поднимаем остров обратно.
+function raiseOverTaskbar() {
+  if (!win || win.isDestroyed() || !visible || customSettings.position !== 'bottom') return;
+  try { win.setAlwaysOnTop(true, 'screen-saver'); win.moveTop(); } catch (e) {}
+}
+setInterval(raiseOverTaskbar, 700);
 // Смена разрешения, подключение/отключение монитора и т.п. — остров не должен улетать за экран.
 try { screen.on('display-metrics-changed', () => applyCustomBounds()); } catch (e) {}
 
@@ -874,7 +1196,8 @@ function startMedia() {
     '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', resPath('media.ps1'),
     '-CmdFile', CMD_FILE,
-    '-ParentPid', String(process.pid)
+    '-ParentPid', String(process.pid),
+    '-LogPath', dataPath('media-bridge.log')
   ], { windowsHide: true });
 
   let buf = '';
@@ -898,7 +1221,10 @@ function startMedia() {
         if (data.kind === 'fg') { handleFg(data); continue; }
         if (data.kind === 'info') {
           const mp = !!(data.ok && data.status === 'Playing');
-          if (mp !== mediaPlaying) { mediaPlaying = mp; applyVisibility(false); }
+          if (mp !== mediaPlaying) {
+            mediaPlaying = mp; applyVisibility(false);
+            if (win && !win.isDestroyed()) win.webContents.send('fx-media', mp);
+          }
         }
         if (win && !win.isDestroyed()) win.webContents.send('media', data);
       } catch (e) {}
@@ -952,14 +1278,14 @@ function setNotif(on) {
 // могли остаться висеть в памяти. Закрываем только наши скрипты и только не от текущего процесса.
 function killOrphanBridges() {
   if (process.platform !== 'win32') return;
-  const cmd = "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.CommandLine -match 'media\\.ps1|notif\\.ps1' -and $_.ParentProcessId -ne " + process.pid + " } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $_.ProcessId }";
+  const cmd = "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" | Where-Object { $_.CommandLine -match 'media\\.ps1|notif\\.ps1|gamestats\\.ps1' -and $_.ParentProcessId -ne " + process.pid + " } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $_.ProcessId }";
   execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', cmd], { windowsHide: true, timeout: 15000 }, (err, out) => {
     const n = String(out || '').trim().split(/\s+/).filter(Boolean).length;
     if (n) log('killed orphan bridges: ' + n);
   });
 }
 // Раз в несколько минут просим окно острова сбросить кэши картинок (обложки, фон блюра и т.п.).
-setInterval(() => { if (win && !win.isDestroyed()) win.webContents.send('mem-trim'); }, 5 * 60 * 1000);
+setInterval(() => { if (win && !win.isDestroyed()) win.webContents.send('mem-trim'); }, 2 * 60 * 1000);
 
 function stopMedia() {
   if (ps) { try { ps.kill(); } catch (e) {} ps = null; }
@@ -982,7 +1308,16 @@ app.whenReady().then(async () => {
   }
   killOrphanBridges();
   fixLegacyAutostart();
+  // Волна под музыку слушает звук компьютера: окну эффектов отдаём «захват экрана» со звуком системы (loopback).
+  // Видео окно сразу останавливает — нужен только звук, ничего никуда не записывается и не отправляется.
+  try {
+    session.defaultSession.setDisplayMediaRequestHandler((req, cb) => {
+      desktopCapturer.getSources({ types: ['screen'] }).then((src) => cb(src[0] ? { video: src[0], audio: 'loopback' } : {})).catch(() => cb({}));
+    });
+  } catch (e) { log('display media handler error: ' + e.message); }
   createWindow();
+  setTimeout(() => { try { fxApply(); } catch (e) {} }, 1500);
+  setTimeout(dlWatch, 2000);
   // После разблокировки компьютера остров возвращается на экран и здоровается.
   try {
     powerMonitor.on('unlock-screen', () => {
@@ -1178,6 +1513,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('notif-get', () => notifOn);
   ipcMain.handle('notif-set', (_e, on) => { setNotif(on); return notifOn; });
   ipcMain.handle('autohide-get', () => autoHide);
+  ipcMain.handle('game-get', () => gameSettings());
+  ipcMain.handle('game-set', (_e, patch) => setGame(patch));
   ipcMain.handle('autohide-set', (_e, on) => { setAutoHide(on); return autoHide; });
   ipcMain.handle('autostart-get', () => autoGet());
   ipcMain.handle('autostart-set', (_e, on) => { autoSet(on); return autoGet(); });

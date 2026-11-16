@@ -13,7 +13,7 @@
   html, body { margin: 0; background: transparent; overflow: hidden; font-family: "Segoe UI", system-ui, sans-serif; color: var(--txt); user-select: none; }
   button { font-family: inherit; }
   #island {
-    position: absolute; top: 8px; left: 50%; transform: translateX(-50%) scale(var(--iscale, 1)); transform-origin: top center;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%) scale(calc(var(--iscale, 1) * var(--ipulse, 1))); transform-origin: top center;
     width: 120px; height: 34px; border-radius: 18px; background: var(--ibg, #000); overflow: hidden;
     box-shadow: 0 8px 24px rgba(0,0,0,.35);
     transition: width .55s cubic-bezier(.3,1.35,.5,1), height .55s cubic-bezier(.3,1.35,.5,1), border-radius .55s cubic-bezier(.3,1.35,.5,1);
@@ -42,7 +42,7 @@
   #p-custom .trow { padding-top: 3px; padding-bottom: 3px; }
   #dragRow { padding: 6px 10px !important; }
   #island[data-mode="full"][data-tab="game"] { height: 452px; }
-  #island[data-mode="full"][data-tab="fx"] { height: 470px; }
+  #island[data-mode="full"][data-tab="fx"] { height: 528px; }
   /* Кружок загрузки из браузера возле часов */
   .dlr { width: 16px; height: 16px; flex: none; display: inline-flex; margin-left: 2px; }
   .dlr svg { width: 16px; height: 16px; overflow: visible; }
@@ -59,7 +59,16 @@
   #fxc { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; display: block; }
   #fxc[hidden] { display: none; }
   /* Эффекты экрана */
-  #p-fx { gap: 8px; }
+  #p-fx { gap: 7px; overflow-y: auto; padding-right: 8px; margin-right: -8px; }
+  /* «Только эффекты»: в свёрнутом острове прячем время, музыку, таймеры — остаётся трава/волна */
+  #island.fxpure .layer.idle, #island.fxpure .layer.multi, #island.fxpure .layer.pop { opacity: 0 !important; visibility: hidden; }
+  #island.fxpure[data-mode="idle"] { width: 240px; }
+  /* «Над экраном»: остров без чёрного овала и тени — видна только трава */
+  #island.fxclear { background: transparent !important; box-shadow: none !important; border-radius: 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); }
+  #island.fxclear::before, #island.fxclear::after { display: none; }
+  #island.fxclear:not([data-bottom]) { top: 0; }
+  #island.fxclear[data-mode="idle"], #island.fxclear[data-mode="multi"], #island.fxclear[data-mode="pop"] { height: 46px; }
+  #island.fxclear:not(.fxgrow)[data-mode="idle"], #island.fxclear:not(.fxgrow)[data-mode="multi"], #island.fxclear:not(.fxgrow)[data-mode="pop"] { width: 260px !important; }
   .fxhead { display: flex; align-items: center; gap: 10px; flex: none; }
   .fxhead b { font-size: 14px; }
   .fxcard { display: flex; flex-direction: column; gap: 7px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--txt) 7%, transparent); flex: none; transition: opacity .2s; }
@@ -160,6 +169,56 @@
   #dragRow:active { background: color-mix(in srgb, var(--txt) 16%, transparent); }
   .dgrip { font-size: 13px; letter-spacing: -2px; opacity: .6; }
   .torder { display: flex; flex-direction: column; gap: 3px; flex: none; }
+  /* ---- Кастом: предпросмотр, пресеты, ползунки ---- */
+  .cprevw { flex: none; display: flex; justify-content: center; align-items: center; height: 58px; border-radius: 14px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--txt) 10%, transparent), color-mix(in srgb, var(--txt) 3%, transparent)); }
+  .cprev { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px 0 6px; background: var(--ibg, #000); color: var(--txt);
+    border-radius: var(--irad, 18px); box-shadow: var(--ishadow, 0 6px 18px rgba(0,0,0,.35)), var(--ioutline, 0 0 0 transparent); font-family: var(--ifont, inherit);
+    font-size: 12.5px; font-weight: 600; transform: scale(var(--iscale, 1)); transition: transform .3s, border-radius .3s, box-shadow .3s; }
+  .cprev .cpcv { width: 20px; height: 20px; border-radius: 6px; background: linear-gradient(135deg, #ff7ac8, #4ea1ff); }
+  .cprev .cpeq { display: flex; gap: 2px; align-items: center; height: 14px; }
+  .cprev .cpeq i { width: 3px; height: 100%; border-radius: 2px; background: var(--txt); animation: dveq .9s ease-in-out infinite; }
+  .cprev .cpeq i:nth-child(2) { animation-delay: .2s; } .cprev .cpeq i:nth-child(3) { animation-delay: .4s; }
+  .cprev .cptime { opacity: .9; margin-left: 4px; }
+  .cpresets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .cpb { border: 0; cursor: pointer; border-radius: 12px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: color-mix(in srgb, var(--txt) 7%, transparent); color: var(--txt); font-size: 11px; font-weight: 600; transition: background .15s, transform .15s; }
+  .cpb:hover { background: color-mix(in srgb, var(--txt) 13%, transparent); }
+  .cpb:active { transform: scale(.96); }
+  .cpb.sel { box-shadow: inset 0 0 0 2px var(--txt); }
+  .cpb .mini { width: 74px; height: 18px; display: flex; align-items: center; justify-content: flex-end; padding: 0 7px; box-sizing: border-box; font: 700 9px/1 "Segoe UI", sans-serif; }
+  .crow { display: flex; align-items: center; gap: 10px; font-size: 12px; min-height: 24px; }
+  .crow > span:first-child { width: 104px; flex: none; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  input[type=range].crg { -webkit-appearance: none; appearance: none; flex: 1; height: 22px; margin: 0; background: transparent; cursor: pointer; }
+  input[type=range].crg::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--txt) var(--fill, 50%), color-mix(in srgb, var(--txt) 20%, transparent) var(--fill, 50%)); }
+  input[type=range].crg::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--txt); margin-top: -5px; box-shadow: 0 1px 4px rgba(0,0,0,.4); transition: transform .15s; }
+  input[type=range].crg:active::-webkit-slider-thumb { transform: scale(1.2); }
+  .cval { width: 38px; text-align: right; font-size: 11.5px; font-variant-numeric: tabular-nums; opacity: .85; flex: none; }
+  .chint { opacity: .5 !important; font-size: 11px; }
+  /* перетаскивание мышкой в списках порядка */
+  .trow.dragg { cursor: grab; }
+  .trow.dragg:active { cursor: grabbing; }
+  .trow .grip { opacity: .4; margin-right: 6px; letter-spacing: -2px; font-size: 11px; flex: none; }
+  .trow.ghost { opacity: .35; }
+  .trow.lift { position: fixed; z-index: 50; pointer-events: none; box-shadow: 0 8px 22px rgba(0,0,0,.45); background: color-mix(in srgb, var(--txt) 22%, var(--ibg, #000)); }
+  /* внешний вид острова из «Кастома» */
+  #island[data-mode="idle"], #island[data-mode="multi"], #island[data-mode="pop"], #island[data-mode="game"] { border-radius: var(--irad, 18px); }
+  #island { box-shadow: var(--ishadow, 0 8px 24px rgba(0,0,0,.35)), var(--ioutline, 0 0 0 transparent); font-family: var(--ifont, inherit); }
+  /* ---- Буфер обмена в «Заметках» ---- */
+  .nseg { flex: none; align-self: stretch; display: flex; }
+  .nseg button { flex: 1; }
+  #p-notes .clv { display: none; flex-direction: column; gap: 6px; min-height: 0; flex: 1; }
+  #p-notes.clipv .clv { display: flex; }
+  #p-notes.clipv .nlv, #p-notes.clipv .nev { display: none !important; }
+  .clhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
+  .cllist { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; min-height: 0; flex: 1; padding-right: 4px; }
+  .clit { display: flex; gap: 9px; align-items: center; padding: 7px 10px; border-radius: 11px; background: color-mix(in srgb, var(--txt) 7%, transparent); font-size: 12px; cursor: pointer; border: 0; color: var(--txt); text-align: left; }
+  .clit:hover { background: color-mix(in srgb, var(--txt) 13%, transparent); }
+  .clit.img { cursor: default; }
+  .clit .cx { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; line-height: 1.3; }
+  .clit .ct { flex: none; opacity: .5; font-size: 10.5px; }
+  .clit img { height: 38px; max-width: 90px; border-radius: 6px; object-fit: cover; flex: none; }
+  .clempty { opacity: .55; font-size: 12px; text-align: center; padding: 22px 0; }
   /* Порядок вкладок — сеткой в 2 колонки (читается слева направо, сверху вниз), без вложенной прокрутки. */
   #torder { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
   #torder .trow { padding: 4px 6px 4px 9px; }
@@ -208,6 +267,10 @@
   .multi { align-items: center; gap: 12px; padding: 0 14px; box-sizing: border-box; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .multi .mm { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; overflow: hidden; }
   .multi .mm .eq { flex: none; }
+  /* строка текста песни в свёрнутом острове: не влезает по ширине — переносится, остров становится выше */
+  #island.lyrwrap[data-mode="multi"] { height: var(--lyrmh, 34px); }
+  #island.lyrwrap .multi .mt { white-space: normal; line-height: 15px; font-size: 12.5px; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+  #island.lyrwrap .multi { white-space: normal; }
   #island.mtight .multi .mt { display: none; }
   .multi .mt { min-width: 20px; flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .chip { display: flex; align-items: center; gap: 5px; flex: none; padding-left: 12px; border-left: 1px solid color-mix(in srgb, var(--txt) 16%, transparent); }
@@ -335,6 +398,14 @@
   #seek:disabled::-webkit-slider-thumb { transform: scale(0); }
 
   .ctl { display: flex; align-items: center; justify-content: center; gap: 24px; height: 42px; position: relative; }
+  /* текст песни под плеером: прошлая строка, текущая (ярко), следующая */
+  .lyr { margin-top: 8px; text-align: center; display: flex; flex-direction: column; gap: 3px; min-height: 62px; justify-content: center; }
+  .lyr div { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; transition: color .3s, opacity .3s; padding: 0 6px; }
+  .lyr .l0, .lyr .l2 { font-size: 12px; color: rgba(255,255,255,.38); }
+  .lyr .l1 { font-size: 15px; font-weight: 700; color: #fff; }
+  .lyr.msg .l1 { font-size: 12px; font-weight: 500; color: rgba(255,255,255,.45); }
+  /* остров растёт по высоте под длину строк текста (--lyrh ставит lyrFit) */
+  #island[data-mode="full"][data-tab="home"].haslyr { height: min(528px, calc(342px + var(--lyrh, 62px))); }
   .ctl button { border: 0; background: none; padding: 0; cursor: pointer; display: grid; place-items: center; transition: transform .12s, opacity .12s; opacity: .92; }
   .ctl button:hover { opacity: 1; transform: scale(1.1); }
   .ctl button:active { transform: scale(.92); }
@@ -634,6 +705,7 @@
             <button class="side plb" id="plBtn" title="Любимые треки"><span class="plg">☰</span></button>
             <button class="side r" id="rep" title="Повтор"><span class="ic" id="repi" data-ic="repeat"></span></button>
           </div>
+          <div class="lyr" id="lyr" hidden><div class="l0" id="ly0"></div><div class="l1" id="ly1"></div><div class="l2" id="ly2"></div></div>
         </div>
       </div>
       <div class="favpanel" id="favpanel" hidden>
@@ -746,8 +818,10 @@
     <!-- Эффекты экрана -->
     <div class="pane" id="p-fx">
       <div class="fxhead"><button class="b sm" id="fxBack">‹ <span id="fxBackLbl">Дизайн</span></button><b id="fxTitle">Эффекты острова</b></div>
+      <div class="fxcard"><div class="drow"><span class="dl" id="fxPureLbl">На острове</span><div class="dseg" id="fxPure"><button data-pure="0">Всё</button><button data-pure="1">Только эффекты</button></div></div>
+        <div class="drow"><span class="dl" id="fxPulseLbl">Свечение под музыку</span><button class="sw2" id="fxPulseSw" role="switch" aria-checked="false"></button></div></div>
       <div class="fxcard" id="fxGrassCard">
-        <div class="fxrow"><span class="fxt">🌿 <span id="fxGrassLbl">Трава по верху острова</span></span><button class="sw2" id="fxGrassSw" role="switch" aria-checked="false"></button></div>
+        <div class="fxrow"><span class="fxt">🌿 <span id="fxGrassLbl">Трава</span></span><button class="sw2" id="fxGrassSw" role="switch" aria-checked="false"></button></div>
         <div class="fxchips">
           <button class="fxchip" data-gc="green" title="Зелёная" style="background:linear-gradient(135deg,#1f6b25,#7fd04a)"></button>
           <button class="fxchip" data-gc="autumn" title="Осень" style="background:linear-gradient(135deg,#a3360f,#f2b134)"></button>
@@ -756,49 +830,76 @@
           <button class="fxchip" data-gc="neon" title="Неон-радуга" style="background:conic-gradient(#f33,#fd3,#3f6,#3cf,#a3f,#f33)"></button>
           <input type="color" id="fxGrassCustom" title="Свой цвет">
         </div>
+        <div class="drow"><span class="dl" id="fxPosLbl">Где</span><div class="dseg" id="fxGPos"><button data-gpos="top">Сверху</button><button data-gpos="bottom">Снизу</button><button data-gpos="screen">Над экраном</button></div></div>
         <div class="drow"><span class="dl" id="fxWindLbl">Ветер</span><div class="dseg" id="fxWind"><button data-wind="calm">Штиль</button><button data-wind="breeze">Ветерок</button><button data-wind="storm">Буря</button></div></div>
         <div class="drow"><span class="dl" id="fxDensLbl">Густота</span><div class="dseg" id="fxDens"><button data-dens="low">Редкая</button><button data-dens="mid">Средняя</button><button data-dens="high">Густая</button></div></div>
         <div class="drow"><label class="dr" id="fxGrassHLbl">Высота <input type="range" class="rg" id="fxGrassH" min="20" max="90"></label><span class="dr"><span id="fxMusLbl">Под музыку</span><button class="sw2" id="fxGrassMus" role="switch" aria-checked="false"></button></span></div>
       </div>
       <div class="fxcard" id="fxWaveCard">
-        <div class="fxrow"><span class="fxt">🌊 <span id="fxWaveLbl">Волна внизу острова</span></span><button class="sw2" id="fxWaveSw" role="switch" aria-checked="false"></button></div>
-        <div class="drow"><span class="dl" id="fxStyleLbl">Вид</span><div class="dseg" id="fxStyle"><button data-ws="wave">Волна</button><button data-ws="line">Линия</button><button data-ws="bars">Столбики</button></div></div>
+        <div class="fxrow"><span class="fxt">🌊 <span id="fxWaveLbl">Музыкальная волна</span></span><button class="sw2" id="fxWaveSw" role="switch" aria-checked="false"></button></div>
+        <div class="drow"><span class="dl" id="fxStyleLbl">Вид</span><div class="dseg" id="fxStyle"><button data-ws="wave">Волна</button><button data-ws="line">Линия</button><button data-ws="bars">Столбики</button><button data-ws="mirror">Зеркало</button></div></div>
+        <div class="drow"><span class="dl" id="fxLenLbl">Длина</span><div class="dseg" id="fxLen"><button data-wlen="full">Вся ширина</button><button data-wlen="track">Остров по треку</button></div></div>
         <div class="fxchips">
           <button class="fxchip" data-wp="neon" title="Неон" style="background:linear-gradient(135deg,#19e3ff,#a23bff)"></button>
           <button class="fxchip" data-wp="rainbow" title="Радуга" style="background:conic-gradient(#f33,#fd3,#3f6,#3cf,#a3f,#f33)"></button>
           <button class="fxchip" data-wp="fire" title="Огонь" style="background:linear-gradient(135deg,#ff2a00,#ffd000)"></button>
           <button class="fxchip" data-wp="ocean" title="Океан" style="background:linear-gradient(135deg,#0a4bff,#14e0c8)"></button>
+          <button class="fxchip" data-wp="sunset" title="Закат" style="background:linear-gradient(135deg,#ff4f8b,#ffb347)"></button>
+          <button class="fxchip" data-wp="mint" title="Мята" style="background:linear-gradient(135deg,#00c9a7,#c4ffe8)"></button>
           <button class="fxchip" data-wp="white" title="Белая" style="background:#f4f4f6"></button>
           <input type="color" id="fxWaveCustom" title="Свой цвет">
         </div>
         <div class="drow"><label class="dr" id="fxWaveHLbl">Высота <input type="range" class="rg" id="fxWaveH" min="30" max="160"></label><label class="dr" id="fxSensLbl">Чувствит. <input type="range" class="rg" id="fxSens" min="0" max="100"></label></div>
+      </div>
+      <div class="fxcard">
+        <div class="fxrow"><span class="fxt">🎤 <span id="fxLyrLbl">Текст песни</span></span><button class="sw2" id="fxLyrSw" role="switch" aria-checked="false"></button></div>
+        <div class="drow"><span class="dl" id="fxLyrMiniLbl">Строка в свёрнутом острове</span><button class="sw2" id="fxLyrMini" role="switch" aria-checked="false"></button></div>
       </div>
       <div class="gmnote" id="fxNote">Волна двигается в такт звуку компьютера — ничего не записывается.</div>
     </div>
 
     <!-- Кастомизация -->
     <div class="pane" id="p-custom">
+      <!-- живой предпросмотр: как будет выглядеть свёрнутый остров -->
+      <div class="cprevw"><div class="cprev" id="cprev"><span class="cpcv"></span><span class="cpt" id="cpTitle">Island</span><span class="cpeq"><i></i><i></i><i></i></span><span class="cptime mono" id="cpTime">12:00</span></div></div>
+      <div class="dsec">
+        <span class="dl" id="cPresetLbl">Готовые стили — нажми, чтобы применить</span>
+        <div class="cpresets" id="cpresets"></div>
+      </div>
+      <div class="dsec">
+        <span class="dl" id="cShapeLbl">Форма и вид</span>
+        <div class="crow"><span id="sizeLbl">Размер</span><input type="range" class="crg" id="cScale" min="80" max="125" step="1"><b class="cval" id="cScaleV">100%</b></div>
+        <div class="crow"><span id="cRadLbl">Скругление</span><input type="range" class="crg" id="cRad" min="6" max="26" step="1"><b class="cval" id="cRadV">18</b></div>
+        <div class="crow"><span id="cShadowLbl">Тень</span><input type="range" class="crg" id="cShadow" min="0" max="100" step="1"><b class="cval" id="cShadowV">45%</b></div>
+        <div class="crow"><span id="cOutlineLbl">Обводка</span><span style="flex:1"></span><button class="sw2" id="cOutline" role="switch" aria-checked="false"></button></div>
+        <div class="crow"><span id="cFontLbl">Шрифт</span><span style="flex:1"></span><div class="dseg" id="cFont"><button data-font="system">Обычный</button><button data-font="geo">Строгий</button><button data-font="mono">Моно</button></div></div>
+      </div>
       <div class="dsec">
         <div class="drow" style="justify-content:space-between"><span class="dl" id="posLbl">Положение</span><div class="dseg" id="posseg"><button data-pos="left">Слева</button><button data-pos="center">Центр</button><button data-pos="right">Справа</button><button data-pos="bottom" title="На панели задач — раскрывается вверх">Снизу</button></div></div>
         <div class="drow" id="dragRow" style="gap:8px;cursor:move"><span class="dgrip">⠿⠿</span><span class="dl" id="dragLbl" style="opacity:.8">Перетащи сюда, чтобы поставить остров куда хочешь</span></div>
-        <div class="drow" style="justify-content:space-between"><span class="dl" id="sizeLbl">Размер острова</span><div class="dseg" id="sizeseg"><button data-size="small">S</button><button data-size="medium">M</button><button data-size="large">L</button></div></div>
       </div>
       <div class="dsec">
+        <div class="crow"><span id="cClipLbl" style="width:auto;flex:1">📋 Показывать на острове, что скопировал</span><button class="sw2" id="cClip" role="switch" aria-checked="true"></button></div>
         <span class="dl" id="greetLbl">Своё приветствие</span>
         <div class="drow"><input type="text" id="greetInput" maxlength="60" placeholder="Напр.: Привет, босс! 👋" style="flex:1;min-width:0;background:color-mix(in srgb, var(--txt) 9%, transparent);border:0;border-radius:10px;padding:7px 10px;color:var(--txt);font-size:12.5px"><button class="b sm" id="greetReset">Авто</button></div>
       </div>
       <div class="dsec">
-        <div class="drow" style="justify-content:space-between"><span class="dl" id="orderLbl">Порядок вкладок</span></div>
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="orderLbl">Порядок вкладок</span><span class="dl chint" id="dragHint">тяни мышкой ⠿</span></div>
         <div class="torder" id="torder"></div>
       </div>
       <div class="dsec">
-        <div class="drow" style="justify-content:space-between"><span class="dl" id="homeWidLbl">Виджеты вкладки «Главная»</span><button class="b sm" id="customReset" title="Вернуть положение, размер, приветствие и порядок к значениям по умолчанию">↺ <span id="resetAllLbl">Сбросить всё</span></button></div>
+        <div class="drow" style="justify-content:space-between"><span class="dl" id="homeWidLbl">Виджеты вкладки «Главная»</span><button class="b sm" id="customReset" title="Вернуть всё к значениям по умолчанию">↺ <span id="resetAllLbl">Сбросить всё</span></button></div>
         <div class="torder" id="homeOrder"></div>
       </div>
     </div>
 
     <!-- Заметки -->
     <div class="pane" id="p-notes">
+      <div class="dseg nseg" id="nseg"><button data-nv="notes" class="sel" id="nvNotes">Заметки</button><button data-nv="clip" id="nvClip">📋 Буфер обмена</button></div>
+      <div class="clv" id="clv">
+        <div class="clhead"><span class="dl" id="clHint">Последнее скопированное. Нажми на текст — скопируется снова.</span><button class="b sm" id="clClear">Очистить</button></div>
+        <div class="cllist" id="cllist"></div>
+      </div>
       <div class="nlv" id="nlv">
       <div class="nrow1"><input class="nin" id="ntext" maxlength="200" placeholder="Новая заметка…"><button class="nadd" id="nadd" title="Создать и открыть">+</button></div>
       <div class="nrow2"><span class="lb" id="remLbl">🔔 напомнить:</span>
@@ -888,7 +989,7 @@
     tabCustom: { ru: 'Кастом', en: 'Custom' },
     posLbl: { ru: 'Положение', en: 'Position' },
     posLeft: { ru: 'Слева', en: 'Left' }, posCenter: { ru: 'Центр', en: 'Center' }, posRight: { ru: 'Справа', en: 'Right' }, posBottom: { ru: 'Снизу', en: 'Bottom' }, posBottomTitle: { ru: 'На панели задач — раскрывается вверх', en: 'On the taskbar — opens upwards' },
-    sizeLbl: { ru: 'Размер острова', en: 'Island size' },
+    sizeLbl: { ru: 'Размер', en: 'Size' },
     greetLbl: { ru: 'Своё приветствие', en: 'Custom greeting' },
     greetReset: { ru: 'Авто', en: 'Auto' },
     greetPh: { ru: 'Напр.: Привет, босс! 👋', en: 'E.g.: Hey boss! 👋' },
@@ -1004,10 +1105,12 @@
     dlLoading: { ru: 'Загрузка', en: 'Downloading' }, dlPerSec: { ru: '/с', en: '/s' }, dlDone: { ru: 'Скачано: ', en: 'Downloaded: ' },
     fxOpenLbl: { ru: 'Эффекты острова: трава и волна под музыку', en: 'Island effects: grass and music wave' },
     fxBackLbl: { ru: 'Дизайн', en: 'Design' }, fxTitle: { ru: 'Эффекты острова', en: 'Island effects' },
-    fxGrassLbl: { ru: 'Трава по верху острова', en: 'Grass along the top' }, fxWaveLbl: { ru: 'Волна внизу острова', en: 'Music wave at the bottom' },
+    fxGrassLbl: { ru: 'Трава', en: 'Grass' }, fxPosLbl: { ru: 'Где', en: 'Position' }, fxLenLbl: { ru: 'Длина', en: 'Length' }, fxPulseLbl: { ru: 'Свечение под музыку', en: 'Glow to the music' }, fxLyrLbl: { ru: 'Текст песни', en: 'Song lyrics' }, fxLyrMiniLbl: { ru: 'Строка в свёрнутом острове', en: 'Line in the collapsed island' }, fxWaveLbl: { ru: 'Музыкальная волна', en: 'Music wave' },
     fxWindLbl: { ru: 'Ветер', en: 'Wind' }, fxDensLbl: { ru: 'Густота', en: 'Density' }, fxMusLbl: { ru: 'Под музыку', en: 'To the music' },
-    fxStyleLbl: { ru: 'Вид', en: 'Style' },
+    fxStyleLbl: { ru: 'Вид', en: 'Style' }, fxPureLbl: { ru: 'На острове', en: 'On the island' },
     fxNote: { ru: 'Волна двигается в такт звуку компьютера — ничего не записывается.', en: 'The wave moves to your PC sound — nothing is recorded.' },
+    lyrLoading: { ru: 'Ищу текст песни…', en: 'Looking for lyrics…' }, lyrNone: { ru: 'Текст для этой песни не найден', en: 'No lyrics found for this song' },
+    lyrNoSync: { ru: 'Есть только текст без тайминга', en: 'Only unsynced lyrics available' }, lyrInst: { ru: 'Инструментал — без слов', en: 'Instrumental — no lyrics' },
     gahideTitle: { ru: 'Прятать остров, когда запущена игра (в режиме игры остров не прячется)', en: 'Hide the island while a game is running (game mode keeps it visible)' },
     tabGame: { ru: 'Игра', en: 'Game' },
     tabGameTitle: { ru: 'Режим игры', en: 'Game mode' },
@@ -1237,10 +1340,13 @@
     setTxt('autostartLbl', 'autostartLabel'); setTtl('auto', 'autostartTitle');
     setTxt('autohideLbl', 'autohideLabel'); setTtl('ahide', 'autohideTitle');
     setTxt('gahideLbl', 'gahideLabel'); setTtl('gahide', 'gahideTitle');
-    ['fxOpenLbl', 'fxBackLbl', 'fxTitle', 'fxGrassLbl', 'fxWaveLbl', 'fxWindLbl', 'fxDensLbl', 'fxMusLbl', 'fxStyleLbl', 'fxNote'].forEach(function (k) { setTxt(k, k); });
-    var fxw = { calm: ['Штиль', 'Calm'], breeze: ['Ветерок', 'Breeze'], storm: ['Буря', 'Storm'] }, fxd = { low: ['Редкая', 'Sparse'], mid: ['Средняя', 'Medium'], high: ['Густая', 'Dense'] }, fxs = { wave: ['Волна', 'Wave'], line: ['Линия', 'Line'], bars: ['Столбики', 'Bars'] };
+    ['fxOpenLbl', 'fxBackLbl', 'fxTitle', 'fxGrassLbl', 'fxWaveLbl', 'fxWindLbl', 'fxDensLbl', 'fxMusLbl', 'fxStyleLbl', 'fxNote', 'fxPureLbl', 'fxPosLbl', 'fxLenLbl', 'fxPulseLbl', 'fxLyrLbl', 'fxLyrMiniLbl'].forEach(function (k) { setTxt(k, k); });
+    qAll('[data-pure]').forEach(function (b) { b.textContent = b.dataset.pure === '1' ? (LANG === 'en' ? 'Effects only' : 'Только эффекты') : (LANG === 'en' ? 'Everything' : 'Всё'); });
+    var fxw = { calm: ['Штиль', 'Calm'], breeze: ['Ветерок', 'Breeze'], storm: ['Буря', 'Storm'] }, fxd = { low: ['Редкая', 'Sparse'], mid: ['Средняя', 'Medium'], high: ['Густая', 'Dense'] }, fxs = { wave: ['Волна', 'Wave'], line: ['Линия', 'Line'], bars: ['Столбики', 'Bars'], mirror: ['Зеркало', 'Mirror'] };
     var li = LANG === 'en' ? 1 : 0;
     qAll('[data-wind]').forEach(function (b) { b.textContent = fxw[b.dataset.wind][li]; });
+    qAll('[data-gpos]').forEach(function (b) { b.textContent = b.dataset.gpos === 'top' ? ['Сверху', 'Top'][li] : b.dataset.gpos === 'screen' ? ['Над экраном', 'Screen top'][li] : ['Снизу', 'Bottom'][li]; });
+    qAll('[data-wlen]').forEach(function (b) { b.textContent = b.dataset.wlen === 'track' ? ['Остров по треку', 'Island by track'][li] : ['Вся ширина', 'Full width'][li]; });
     qAll('[data-dens]').forEach(function (b) { b.textContent = fxd[b.dataset.dens][li]; });
     qAll('[data-ws]').forEach(function (b) { b.textContent = fxs[b.dataset.ws][li]; });
     var fh = $('fxGrassHLbl'); if (fh && fh.firstChild) fh.firstChild.nodeValue = (li ? 'Height ' : 'Высота ');
@@ -1485,9 +1591,10 @@
   }
 
   var popCover = false;
-  function showPopup(text, ms, force, cover) {
+  var popImg = '';
+  function showPopup(text, ms, force, cover, img) {
     if (F.on && !force) return; // в режиме «Не беспокоить» остров молчит
-    popCover = !!cover;
+    popCover = !!cover; popImg = img || '';
     $('pt').textContent = text;
     popup = true;
     clearTimeout(popTimer);
@@ -2132,8 +2239,10 @@
   var C = {
     position: 'center', size: 'medium', greeting: '',
     tabOrder: ['home', 'timer', 'focus', 'day', 'apps', 'notes', 'game', 'design', 'custom'],
-    homeOrder: ['clock', 'app', 'media'], homeHidden: []
+    homeOrder: ['clock', 'app', 'media'], homeHidden: [],
+    scale: null, radius: 18, outline: false, shadow: 45, font: 'system', clip: true
   };
+  function curScale() { return typeof C.scale === 'number' ? C.scale : (SIZE_SCALE[C.size] || 1); }
   var cSaveTimer = null;
   function saveC() { clearTimeout(cSaveTimer); cSaveTimer = setTimeout(function () { window.api.customSave(C); }, 300); }
   function renderPosSeg() { qAll('[data-pos]').forEach(function (b) { b.classList.toggle('sel', b.dataset.pos === C.position); }); applyDock(); }
@@ -2146,7 +2255,29 @@
     try { draw(); } catch (e) {}
   }
   function renderSizeSeg() { qAll('[data-size]').forEach(function (b) { b.classList.toggle('sel', b.dataset.size === C.size); }); }
-  function applyScale() { document.documentElement.style.setProperty('--iscale', String(SIZE_SCALE[C.size] || 1)); }
+  function applyScale() { document.documentElement.style.setProperty('--iscale', String(curScale())); }
+  // Вид острова: скругление, тень, обводка, шрифт — через CSS-переменные
+  var FONTS = { system: '', geo: 'Bahnschrift, "Segoe UI", sans-serif', mono: 'Consolas, "Cascadia Mono", monospace' };
+  function applyLook() {
+    var r = document.documentElement.style;
+    r.setProperty('--irad', C.radius + 'px');
+    var sh = C.shadow / 100;
+    r.setProperty('--ishadow', sh > 0 ? '0 ' + Math.round(4 + sh * 8) + 'px ' + Math.round(8 + sh * 26) + 'px rgba(0,0,0,' + (0.15 + sh * 0.5).toFixed(2) + ')' : '0 0 0 transparent');
+    r.setProperty('--ioutline', C.outline ? '0 0 0 1.5px color-mix(in srgb, var(--txt) 55%, transparent)' : '0 0 0 transparent');
+    if (FONTS[C.font]) r.setProperty('--ifont', FONTS[C.font]); else r.removeProperty('--ifont');
+  }
+  function setFill(el) { if (!el) return; var p = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty('--fill', p + '%'); }
+  function renderLook() {
+    var sc = $('cScale'); if (!sc) return;
+    sc.value = Math.round(curScale() * 100); $('cScaleV').textContent = sc.value + '%'; setFill(sc);
+    $('cRad').value = C.radius; $('cRadV').textContent = C.radius; setFill($('cRad'));
+    $('cShadow').value = C.shadow; $('cShadowV').textContent = C.shadow + '%'; setFill($('cShadow'));
+    swDraw('cOutline', C.outline); swDraw('cClip', C.clip !== false);
+    qAll('[data-font]').forEach(function (b) { b.classList.toggle('sel', b.dataset.font === C.font); });
+    qAll('.cpb').forEach(function (b) { b.classList.toggle('sel', b.dataset.cp === C.preset); });
+    var tm = new Date(); if ($('cpTime')) $('cpTime').textContent = String(tm.getHours()).padStart(2, '0') + ':' + String(tm.getMinutes()).padStart(2, '0');
+  }
+  function lookChanged(keepPreset) { if (!keepPreset) C.preset = ''; applyScale(); applyLook(); renderLook(); saveC(); }
   function applyTabOrder() {
     var wrap = document.querySelector('.tabs');
     if (!wrap) return;
@@ -2155,21 +2286,51 @@
       if (el) wrap.appendChild(el);
     });
   }
+  // Перетаскивание мышкой: зажми строку и тяни — остальные раздвигаются, отпусти — порядок сохранится.
+  function makeSortable(wrap, list, labelOf, onDone, extra) {
+    wrap.innerHTML = '';
+    list.forEach(function (id, i) {
+      var row = document.createElement('div'); row.className = 'trow dragg'; row.dataset.id = id;
+      var tl = document.createElement('div'); tl.className = 'tl';
+      var g = document.createElement('span'); g.className = 'grip'; g.textContent = '⠿'; tl.appendChild(g);
+      var lbl = document.createElement('span'); lbl.textContent = labelOf(id); tl.appendChild(lbl); row.appendChild(tl);
+      if (extra) extra(row, id, lbl);
+      row.addEventListener('pointerdown', function (e) {
+        if (e.button !== 0 || (e.target.closest && e.target.closest('button'))) return;
+        e.preventDefault(); e.stopPropagation();
+        var r0 = row.getBoundingClientRect(), offX = e.clientX - r0.left, offY = e.clientY - r0.top, moved = false;
+        var lift = row.cloneNode(true); lift.classList.add('lift'); lift.style.width = r0.width + 'px'; lift.style.height = r0.height + 'px';
+        function mv(ev) {
+          if (!moved && Math.abs(ev.clientY - e.clientY) + Math.abs(ev.clientX - e.clientX) < 4) return;
+          if (!moved) { moved = true; document.body.appendChild(lift); row.classList.add('ghost'); }
+          lift.style.left = (ev.clientX - offX) + 'px'; lift.style.top = (ev.clientY - offY) + 'px';
+          // ищем строку под курсором и ставим нашу перед/после неё
+          var rows = Array.prototype.slice.call(wrap.children);
+          for (var k = 0; k < rows.length; k++) {
+            var o = rows[k]; if (o === row) continue;
+            var b = o.getBoundingClientRect();
+            if (ev.clientX >= b.left && ev.clientX <= b.right && ev.clientY >= b.top && ev.clientY <= b.bottom) {
+              var before = rows.indexOf(row) > k;
+              wrap.insertBefore(row, before ? o : o.nextSibling);
+              break;
+            }
+          }
+        }
+        function up() {
+          document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up);
+          if (lift.parentNode) lift.parentNode.removeChild(lift);
+          row.classList.remove('ghost');
+          if (moved) onDone(Array.prototype.map.call(wrap.children, function (x) { return x.dataset.id; }));
+        }
+        document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+      });
+      wrap.appendChild(row);
+    });
+  }
   function renderTorder() {
     var wrap = $('torder'); if (!wrap) return;
-    wrap.innerHTML = '';
-    C.tabOrder.forEach(function (id, i) {
-      var row = document.createElement('div'); row.className = 'trow';
-      var tl = document.createElement('div'); tl.className = 'tl';
-      var num = document.createElement('span'); num.className = 'num'; num.textContent = String(i + 1); tl.appendChild(num);
-      var lbl = document.createElement('span'); lbl.textContent = TAB_LABEL[id] || id; tl.appendChild(lbl); row.appendChild(tl);
-      var btns = document.createElement('div'); btns.className = 'tbtns';
-      var up = document.createElement('button'); up.textContent = '‹'; up.title = '←'; up.disabled = i === 0;
-      up.addEventListener('click', function () { moveTab(i, -1); });
-      var dn = document.createElement('button'); dn.textContent = '›'; dn.title = '→'; dn.disabled = i === C.tabOrder.length - 1;
-      dn.addEventListener('click', function () { moveTab(i, 1); });
-      btns.appendChild(up); btns.appendChild(dn); row.appendChild(btns);
-      wrap.appendChild(row);
+    makeSortable(wrap, C.tabOrder, function (id) { return t('tab_' + id) !== 'tab_' + id ? t('tab_' + id) : (TAB_LABEL[id] || id); }, function (ord) {
+      C.tabOrder = ord; applyTabOrder(); renderTorder(); saveC();
     });
   }
   function moveTab(i, dir) {
@@ -2188,22 +2349,15 @@
   }
   function renderHomeOrder() {
     var wrap = $('homeOrder'); if (!wrap) return;
-    wrap.innerHTML = '';
-    C.homeOrder.forEach(function (id, i) {
+    makeSortable(wrap, C.homeOrder, function (id) { return HOME_WIDGET_LABEL[id] || id; }, function (ord) {
+      C.homeOrder = ord; applyHomeOrder(); renderHomeOrder(); saveC();
+    }, function (row, id, lbl) {
       var hidden = C.homeHidden.indexOf(id) >= 0;
-      var row = document.createElement('div'); row.className = 'trow';
-      var lbl = document.createElement('span'); lbl.textContent = HOME_WIDGET_LABEL[id] || id;
-      if (hidden) lbl.style.opacity = '.5';
-      row.appendChild(lbl);
+      if (hidden) lbl.style.opacity = '.45';
       var btns = document.createElement('div'); btns.className = 'tbtns';
-      var eye = document.createElement('button'); eye.textContent = hidden ? '👁' : '🚫'; eye.title = hidden ? 'Показать' : 'Скрыть';
+      var eye = document.createElement('button'); eye.className = 'sw2' + (hidden ? '' : ' on'); eye.title = hidden ? 'Показать' : 'Скрыть';
       eye.addEventListener('click', function () { toggleHomeWidget(id); });
-      var up = document.createElement('button'); up.textContent = '↑'; up.disabled = i === 0;
-      up.addEventListener('click', function () { moveHomeWidget(i, -1); });
-      var dn = document.createElement('button'); dn.textContent = '↓'; dn.disabled = i === C.homeOrder.length - 1;
-      dn.addEventListener('click', function () { moveHomeWidget(i, 1); });
-      btns.appendChild(eye); btns.appendChild(up); btns.appendChild(dn); row.appendChild(btns);
-      wrap.appendChild(row);
+      btns.appendChild(eye); row.appendChild(btns);
     });
   }
   function moveHomeWidget(i, dir) {
@@ -2225,6 +2379,101 @@
   qAll('[data-size]').forEach(function (b) { b.addEventListener('click', function () { C.size = b.dataset.size; renderSizeSeg(); applyScale(); saveC(); }); });
   if ($('greetInput')) $('greetInput').addEventListener('input', function () { C.greeting = $('greetInput').value.slice(0, 60); saveC(); });
   if ($('greetReset')) $('greetReset').addEventListener('click', function () { C.greeting = ''; $('greetInput').value = ''; saveC(); });
+  // ползунки — тянешь мышкой, остров меняется сразу
+  if ($('cScale')) {
+    $('cScale').addEventListener('input', function () { C.scale = Math.round(+this.value) / 100; C.size = C.scale < 0.93 ? 'small' : C.scale > 1.07 ? 'large' : 'medium'; lookChanged(); });
+    $('cRad').addEventListener('input', function () { C.radius = +this.value; lookChanged(); });
+    $('cShadow').addEventListener('input', function () { C.shadow = +this.value; lookChanged(); });
+    $('cOutline').addEventListener('click', function () { C.outline = !C.outline; lookChanged(); });
+    $('cClip').addEventListener('click', function () { C.clip = C.clip === false; lookChanged(true); });
+    qAll('[data-font]').forEach(function (b) { b.addEventListener('click', function () { C.font = b.dataset.font; lookChanged(); }); });
+  }
+  // Готовые стили: цвет и прозрачность из «Дизайна» + форма из «Кастома» одним нажатием
+  var CPRESETS = [
+    { id: 'classic', n: ['Классика', 'Classic'], d: { preset: 'classic', mode: 'color', color: '#000000', alpha: 100, txt: '#ffffff' }, c: { scale: 1, radius: 18, shadow: 45, outline: false, font: 'system' } },
+    { id: 'mini', n: ['Минимал', 'Minimal'], d: { preset: 'classic', mode: 'color', color: '#000000', alpha: 100, txt: '#ffffff' }, c: { scale: 0.88, radius: 12, shadow: 0, outline: false, font: 'system' } },
+    { id: 'glass', n: ['Стекло', 'Glass'], d: { preset: 'glass', mode: 'color', color: '#14141c', alpha: 45, txt: '#ffffff' }, c: { scale: 1, radius: 20, shadow: 25, outline: true, font: 'system' } },
+    { id: 'neon', n: ['Неон', 'Neon'], d: { preset: 'custom', mode: 'color', color: '#05060d', alpha: 100, txt: '#4dd2ff' }, c: { scale: 1, radius: 18, shadow: 60, outline: true, font: 'geo' } },
+    { id: 'light', n: ['Светлый', 'Light'], d: { preset: 'light', mode: 'color', color: '#f4f4f6', alpha: 100, txt: '#111114' }, c: { scale: 1, radius: 18, shadow: 30, outline: false, font: 'system' } },
+    { id: 'big', n: ['Крупный', 'Large'], d: { preset: 'classic', mode: 'color', color: '#000000', alpha: 100, txt: '#ffffff' }, c: { scale: 1.18, radius: 22, shadow: 55, outline: false, font: 'system' } },
+    { id: 'retro', n: ['Терминал', 'Terminal'], d: { preset: 'green', mode: 'color', color: '#000000', alpha: 100, txt: '#3ddc84' }, c: { scale: 1, radius: 8, shadow: 40, outline: true, font: 'mono' } },
+    { id: 'rose', n: ['Розовый', 'Rose'], d: { preset: 'pink', mode: 'color', color: '#1a0b14', alpha: 100, txt: '#ff7ac8' }, c: { scale: 1, radius: 24, shadow: 45, outline: false, font: 'system' } },
+    { id: 'sea', n: ['Море', 'Sea'], d: { preset: 'navy', mode: 'color', color: '#0b1d3a', alpha: 100, txt: '#e6f0ff' }, c: { scale: 1, radius: 18, shadow: 45, outline: false, font: 'geo' } }
+  ];
+  function renderCPresets() {
+    var w = $('cpresets'); if (!w) return; w.innerHTML = '';
+    var li = (typeof LANG !== 'undefined' && LANG === 'en') ? 1 : 0;
+    CPRESETS.forEach(function (p) {
+      var b = document.createElement('button'); b.className = 'cpb'; b.dataset.cp = p.id;
+      var m = document.createElement('span'); m.className = 'mini';
+      var c = hexRgb(p.d.color);
+      m.style.background = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + Math.max(p.d.alpha / 100, 0.55) + ')';
+      m.style.color = p.d.txt; m.style.borderRadius = Math.round(p.c.radius * 0.55) + 'px';
+      m.style.transform = 'scale(' + (0.85 + (p.c.scale - 0.88) * 0.6).toFixed(2) + ')';
+      if (p.c.outline) m.style.boxShadow = '0 0 0 1px ' + p.d.txt;
+      if (FONTS[p.c.font]) m.style.fontFamily = FONTS[p.c.font];
+      m.textContent = '12:00';
+      var n = document.createElement('span'); n.textContent = p.n[li];
+      b.appendChild(m); b.appendChild(n);
+      b.addEventListener('click', function () {
+        Object.assign(D, p.d); changed(); // цвет — как в «Дизайне», сохраняется там же
+        Object.assign(C, p.c); C.preset = p.id;
+        C.size = C.scale < 0.93 ? 'small' : C.scale > 1.07 ? 'large' : 'medium';
+        lookChanged(true);
+      });
+      w.appendChild(b);
+    });
+    renderLook();
+  }
+  renderCPresets();
+
+  /* ---------- Буфер обмена: всплывашка на острове + история в «Заметках» ---------- */
+  function clipAgo(at) {
+    var m = Math.round((Date.now() - at) / 60000), en = LANG === 'en';
+    if (m < 1) return en ? 'now' : 'сейчас';
+    if (m < 60) return m + (en ? ' min' : ' мин');
+    return Math.round(m / 60) + (en ? ' h' : ' ч');
+  }
+  function clipRender() {
+    var w = $('cllist'); if (!w) return;
+    window.api.clipList().then(function (list) {
+      w.innerHTML = '';
+      if (!list || !list.length) { var e = document.createElement('div'); e.className = 'clempty'; e.textContent = LANG === 'en' ? 'Copy something — it will appear here' : 'Скопируй что-нибудь — оно появится здесь'; w.appendChild(e); return; }
+      list.forEach(function (it, i) {
+        var b = document.createElement(it.kind === 'text' ? 'button' : 'div'); b.className = 'clit' + (it.kind === 'image' ? ' img' : '');
+        if (it.kind === 'image') { var im = document.createElement('img'); im.src = it.thumb || ''; b.appendChild(im); }
+        var x = document.createElement('span'); x.className = 'cx';
+        x.textContent = it.kind === 'image' ? (LANG === 'en' ? 'Image ' : 'Картинка ') + it.w + '×' + it.h : it.text;
+        var tm = document.createElement('span'); tm.className = 'ct'; tm.textContent = clipAgo(it.at);
+        b.appendChild(x); b.appendChild(tm);
+        if (it.kind === 'text') b.addEventListener('click', function () {
+          window.api.clipUse(i).then(function (ok) { if (ok) showPopup(LANG === 'en' ? '📋 Copied again' : '📋 Скопировано снова', 1500, true); });
+        });
+        w.appendChild(b);
+      });
+    }).catch(function () {});
+  }
+  function notesView(v) {
+    var pn = $('p-notes'); if (!pn) return;
+    pn.classList.toggle('clipv', v === 'clip');
+    qAll('[data-nv]').forEach(function (b) { b.classList.toggle('sel', b.dataset.nv === v); });
+    if (v === 'clip') clipRender();
+  }
+  qAll('[data-nv]').forEach(function (b) { b.addEventListener('click', function () { notesView(b.dataset.nv); }); });
+  if ($('clClear')) $('clClear').addEventListener('click', function () { window.api.clipClear().then(clipRender); });
+  try {
+    window.api.onClip(function (it) {
+      if (C.clip === false) return;
+      var en = LANG === 'en', txt;
+      if (it.kind === 'image') txt = '📋 ' + (en ? 'Image ' : 'Картинка ') + it.w + '×' + it.h;
+      else {
+        var one = String(it.text || '').replace(/\s+/g, ' ').trim();
+        txt = '📋 ' + (one.length > 42 ? one.slice(0, 42) + '…' : one);
+      }
+      showPopup(txt, 2200, false, false, it.kind === 'image' ? it.thumb : '');
+      if ($('p-notes') && $('p-notes').classList.contains('clipv')) clipRender();
+    });
+  } catch (e) {}
   function applyCFromServer(r) {
     if (r) {
       if (['center', 'left', 'right', 'custom', 'bottom'].indexOf(r.position) >= 0) C.position = r.position;
@@ -2235,7 +2484,14 @@
       if (Array.isArray(r.tabOrder) && r.tabOrder.length) C.tabOrder = r.tabOrder.filter(function (id) { return TAB_LABEL.hasOwnProperty(id); });
       if (Array.isArray(r.homeOrder) && r.homeOrder.length) C.homeOrder = r.homeOrder.filter(function (id) { return HOME_WIDGET_LABEL.hasOwnProperty(id); });
       if (Array.isArray(r.homeHidden)) C.homeHidden = r.homeHidden.filter(function (id) { return HOME_WIDGET_LABEL.hasOwnProperty(id); });
+      C.scale = typeof r.scale === 'number' ? r.scale : null;
+      if (typeof r.radius === 'number') C.radius = r.radius;
+      if (typeof r.shadow === 'number') C.shadow = r.shadow;
+      C.outline = r.outline === true; C.clip = r.clip !== false;
+      if (r.font) C.font = r.font;
+      if (typeof r.preset === 'string') C.preset = r.preset;
     }
+    applyLook(); renderLook();
     renderPosSeg(); renderSizeSeg(); applyScale(); applyTabOrder(); renderTorder(); applyHomeOrder(); renderHomeOrder();
     if ($('greetInput')) $('greetInput').value = C.greeting || '';
   }
@@ -2328,15 +2584,19 @@
   var FX = null, fxTimer = null;
   function fxRender() {
     if (!FX) return;
-    swDraw('fxGrassSw', FX.grass.on); swDraw('fxGrassMus', FX.grass.music); swDraw('fxWaveSw', FX.wave.on);
+    swDraw('fxLyrSw', FX.lyrics && FX.lyrics.on); swDraw('fxLyrMini', !FX.lyrics || FX.lyrics.mini !== false); lyrSync();
+    swDraw('fxPulseSw', FX.pulse === true); swDraw('fxGrassSw', FX.grass.on); swDraw('fxGrassMus', FX.grass.music); swDraw('fxWaveSw', FX.wave.on);
     $('fxGrassCard').classList.toggle('off', !FX.grass.on); $('fxWaveCard').classList.toggle('off', !FX.wave.on);
     qAll('[data-gc]').forEach(function (b) { b.classList.toggle('sel', b.dataset.gc === FX.grass.color); });
     $('fxGrassCustom').classList.toggle('sel', FX.grass.color === 'custom');
     qAll('[data-wp]').forEach(function (b) { b.classList.toggle('sel', b.dataset.wp === FX.wave.palette); });
     $('fxWaveCustom').classList.toggle('sel', FX.wave.palette === 'custom');
     qAll('[data-wind]').forEach(function (b) { b.classList.toggle('sel', b.dataset.wind === FX.grass.wind); });
+    qAll('[data-gpos]').forEach(function (b) { b.classList.toggle('sel', b.dataset.gpos === (FX.grass.pos || 'top')); });
+    qAll('[data-wlen]').forEach(function (b) { b.classList.toggle('sel', b.dataset.wlen === (FX.wave.len || 'full')); });
     qAll('[data-dens]').forEach(function (b) { b.classList.toggle('sel', b.dataset.dens === FX.grass.density); });
     qAll('[data-ws]').forEach(function (b) { b.classList.toggle('sel', b.dataset.ws === FX.wave.style); });
+    qAll('[data-pure]').forEach(function (b) { b.classList.toggle('sel', (b.dataset.pure === '1') === !!FX.pure); });
     if (document.activeElement !== $('fxGrassH')) $('fxGrassH').value = FX.grass.height;
     if (document.activeElement !== $('fxWaveH')) $('fxWaveH').value = FX.wave.height;
     if (document.activeElement !== $('fxSens')) $('fxSens').value = FX.wave.sens;
@@ -2347,7 +2607,10 @@
     if (!FX) return;
     if (patch.grass) Object.assign(FX.grass, patch.grass);
     if (patch.wave) Object.assign(FX.wave, patch.wave);
-    fxRender(); fxKick();
+    if (typeof patch.pure === 'boolean') FX.pure = patch.pure;
+    if (typeof patch.pulse === 'boolean') FX.pulse = patch.pulse;
+    if (patch.lyrics) FX.lyrics = Object.assign({}, FX.lyrics, patch.lyrics);
+    fxRender(); fxKick(); draw();
     clearTimeout(fxTimer);
     fxTimer = setTimeout(function () { try { window.api.fxSet(patch).then(function (d) { if (d) { FX = d; fxRender(); } }).catch(function () {}); } catch (e) {} }, now ? 0 : 120);
   }
@@ -2407,42 +2670,108 @@
     rainbow: function (pp, tm) { return [(pp * 300 + tm * 50) % 360, 90, 58]; },
     fire: function (pp) { return [pp * 50, 100, 52]; },
     ocean: function (pp) { return [200 - pp * 40, 85, 55]; },
+    sunset: function (pp) { return [340 + pp * 55, 100, 62]; },
+    mint: function (pp) { return [168 - pp * 10, 80, 50 + pp * 30]; },
     white: function () { return [0, 0, 96]; }
   };
+  // Трава в три слоя: дальний (тёмный, гуще, почти не качается), средний и ближний (светлый, крупный,
+  // с прожилкой посередине). Стебли изогнуты, сужаются к кончику, у каждого свой наклон;
+  // кое-где колоски и цветочки. Корни прикрыты мягкой тенью «земли».
   function fxMakeBlades() {
-    var g = FX.grass, step = g.density === 'low' ? 5 : g.density === 'high' ? 2 : 3.2, x = 0;
-    fxBlades = [];
+    var g = FX.grass, k = g.density === 'low' ? 1.6 : g.density === 'high' ? 0.65 : 1;
     var seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
-    while (x < 520) { fxBlades.push({ x: x + rnd() * step, h: 0.45 + rnd() * 0.55, w: 1.2 + rnd() * 1.8, j: rnd(), ph: rnd() * 6.28, st: 0.7 + rnd() * 0.6 }); x += step * (0.6 + rnd() * 0.8); }
-    fxBlades.sort(function (a, b) { return b.h - a.h; });
+    fxBlades = [];
+    [[0, 2.2, 0.35, 0.75, 1.0], [1, 3.0, 0.45, 0.95, 1.4], [2, 4.6, 0.55, 1.0, 1.9]].forEach(function (L) {
+      var layer = L[0], step = L[1] * k, x = -4;
+      while (x < 524) {
+        var b = { L: layer, x: x + rnd() * step, h: (L[2] + rnd() * (L[3] - L[2])), w: (0.9 + rnd() * 0.9) * L[4],
+          j: rnd(), ph: rnd() * 6.28, st: 0.7 + rnd() * 0.6, lean: (rnd() - 0.5) * 0.5, curl: rnd() < 0.18 ? (rnd() - 0.5) * 0.9 : 0 };
+        // на ближнем слое изредка — колосок или цветок
+        if (layer === 2 && rnd() < 0.07) b.top = rnd() < 0.5 ? 'seed' : 'flower';
+        if (layer === 2 && rnd() < 0.25) b.h *= 1.12;
+        fxBlades.push(b);
+        x += step * (0.55 + rnd() * 0.9);
+      }
+    });
+    fxBlades.sort(function (a, b) { return a.L - b.L || b.h - a.h; });
     fxBladesKey = g.density;
   }
   function fxDrawGrass(tm, W, Hh) {
     var g = FX.grass;
-    if (fxBladesKey !== g.density || !fxBlades.length) fxMakeBlades();
+    if (fxBladesKey !== g.density || !fxBlades.length || fxBlades[0].L == null) fxMakeBlades();
     var amp = g.wind === 'calm' ? 0.07 : g.wind === 'storm' ? 0.34 : 0.17, spd = g.wind === 'calm' ? 0.8 : g.wind === 'storm' ? 2.6 : 1.5;
     var mus = g.music ? Math.min(1, fxLevel * 2.2) : 0, base = g.color === 'custom' ? fxHexHsl(g.custom) : null;
     var gust = Math.sin(tm * spd * 0.37) * 0.5 + Math.sin(tm * spd * 0.11 + 1.3) * 0.5;
+    var LDIM = [0.55, 0.78, 1], LAMP = [0.45, 0.75, 1];
     for (var i = 0; i < fxBlades.length; i++) {
-      var b = fxBlades[i]; if (b.x > W + 4) continue;
+      var b = fxBlades[i]; if (b.x > W + 6) continue;
       var c = base ? [base[0] + (b.j - .5) * 24, base[1], base[2] * (0.7 + b.j * 0.55)] : (FX_GRASS[g.color] || FX_GRASS.green)(b.j, tm, b.x);
-      var a = (Math.sin(tm * spd * b.st + b.x * 0.05 + b.ph) * 0.6 + gust * 0.6) * amp + mus * 0.25 * Math.sin(tm * 9 + b.ph);
-      var hh = Hh * b.h * (1 + mus * 0.3), bend = Math.sin(a) * hh, tipY = Math.cos(a) * hh;
-      fctx.beginPath();
-      fctx.moveTo(b.x - b.w, 0);
-      fctx.quadraticCurveTo(b.x - b.w * 0.3 + bend * 0.35, tipY * 0.55, b.x + bend, tipY);
-      fctx.quadraticCurveTo(b.x + b.w * 0.3 + bend * 0.35, tipY * 0.55, b.x + b.w, 0);
-      fctx.closePath();
+      var dim = LDIM[b.L];
+      var a = ((Math.sin(tm * spd * b.st + b.x * 0.05 + b.ph) * 0.6 + gust * 0.6) * amp + mus * 0.25 * Math.sin(tm * 9 + b.ph)) * LAMP[b.L] + b.lean * 0.35;
+      var hh = Hh * b.h * (1 + mus * 0.3 * LAMP[b.L]);
+      // изгиб нарастает к кончику (как у настоящего стебля), плюс собственный завиток
+      var ang = a + b.curl * 0.5, tipX = b.x + Math.sin(ang) * hh, tipY = Math.cos(ang) * hh * (1 - Math.abs(b.curl) * 0.15);
+      var midX = b.x + Math.sin(a * 0.45) * hh * 0.5, midY = hh * 0.5;
+      var w = b.w;
+      // левая (освещённая) и правая (теневая) половинки листа — даёт объём
       var gr = fctx.createLinearGradient(0, 0, 0, Math.max(1, tipY));
-      gr.addColorStop(0, fxHsl([c[0], c[1], c[2] * 0.55])); gr.addColorStop(1, fxHsl([c[0], c[1], c[2] * 1.15]));
-      fctx.fillStyle = gr; fctx.fill();
+      gr.addColorStop(0, fxHsl([c[0], c[1], c[2] * 0.45 * dim]));
+      gr.addColorStop(0.6, fxHsl([c[0], c[1], c[2] * 0.95 * dim]));
+      gr.addColorStop(1, fxHsl([c[0] + 6, c[1] * 0.9, Math.min(92, c[2] * 1.3 * dim)]));
+      fctx.beginPath();
+      fctx.moveTo(b.x - w, 0);
+      fctx.quadraticCurveTo(midX - w * 0.55, midY, tipX, tipY);
+      fctx.quadraticCurveTo(midX, midY, b.x, 0);
+      fctx.closePath(); fctx.fillStyle = gr; fctx.fill();
+      var gr2 = fctx.createLinearGradient(0, 0, 0, Math.max(1, tipY));
+      gr2.addColorStop(0, fxHsl([c[0], c[1], c[2] * 0.32 * dim]));
+      gr2.addColorStop(1, fxHsl([c[0], c[1], c[2] * 0.85 * dim]));
+      fctx.beginPath();
+      fctx.moveTo(b.x, 0);
+      fctx.quadraticCurveTo(midX, midY, tipX, tipY);
+      fctx.quadraticCurveTo(midX + w * 0.55, midY, b.x + w, 0);
+      fctx.closePath(); fctx.fillStyle = gr2; fctx.fill();
+      // прожилка-блик на крупных стеблях ближнего слоя
+      if (b.L === 2 && w > 1.6 && hh > 8) {
+        fctx.beginPath(); fctx.moveTo(b.x - w * 0.15, hh * 0.08);
+        fctx.quadraticCurveTo(midX - w * 0.2, midY, tipX + (b.x - tipX) * 0.12, tipY * 0.9);
+        fctx.strokeStyle = fxHsl([c[0] + 10, c[1] * 0.7, Math.min(95, c[2] * 1.6)], 0.35); fctx.lineWidth = 0.6; fctx.stroke();
+      }
+      if (b.top && hh > 10) {
+        if (b.top === 'seed') {
+          // колосок: несколько зёрнышек вдоль кончика
+          fctx.fillStyle = 'hsla(44,55%,' + (62 + b.j * 14).toFixed(0) + '%,.92)'; // золотистые зёрна
+          for (var q = 0; q < 4; q++) { var tq = 0.78 + q * 0.06; fctx.beginPath(); fctx.ellipse(b.x + (tipX - b.x) * tq, tipY * tq, 1.1, 2.1, -ang, 0, 6.29); fctx.fill(); }
+        } else {
+          // маленький цветок: белые лепестки и жёлтая серединка
+          var fr = 2.2 + b.j * 1.2; fctx.fillStyle = 'rgba(255,255,255,.92)';
+          for (var pq = 0; pq < 5; pq++) { var pa = pq * 1.2566 + tm * 0.3; fctx.beginPath(); fctx.arc(tipX + Math.cos(pa) * fr * 0.7, tipY + Math.sin(pa) * fr * 0.7, fr * 0.55, 0, 6.29); fctx.fill(); }
+          fctx.fillStyle = '#ffd34d'; fctx.beginPath(); fctx.arc(tipX, tipY, fr * 0.45, 0, 6.29); fctx.fill();
+        }
+      }
     }
+    // мягкая «земля» у корней, чтобы трава не обрывалась резкой линией
+    var gg = fctx.createLinearGradient(0, 0, 0, Math.min(10, Hh * 0.35));
+    var cg = base || (FX_GRASS[g.color] || FX_GRASS.green)(0.2, tm, 0);
+    gg.addColorStop(0, fxHsl([cg[0], cg[1], cg[2] * 0.35], 0.9)); gg.addColorStop(1, fxHsl([cg[0], cg[1], cg[2] * 0.35], 0));
+    fctx.fillStyle = gg; fctx.fillRect(0, 0, W, Math.min(10, Hh * 0.35));
   }
   function fxWaveColor(pp, tm) { var w = FX.wave; if (w.palette === 'custom') { var c = fxHexHsl(w.custom); return [c[0] + (pp - .5) * 30, c[1], c[2]]; } return (FX_WAVE[w.palette] || FX_WAVE.neon)(pp, tm); }
   function fxDrawWave(tm, W, H, maxH) {
     var w = FX.wave, n = w.style === 'bars' ? 40 : 32, v = fxReadBands(n, w.sens), baseY = H;
     var grad = fctx.createLinearGradient(0, 0, W, 0);
     for (var s0 = 0; s0 <= 6; s0++) grad.addColorStop(s0 / 6, fxHsl(fxWaveColor(s0 / 6, tm)));
+    if (w.style === 'mirror') {
+      // столбики от средней линии вверх и вниз
+      var cm = Math.max(8, Math.floor(W / 7)), bwm = W / cm, gm = Math.max(1, bwm * 0.3), mid = H / 2;
+      fctx.fillStyle = grad; fctx.globalAlpha = 0.9;
+      for (var im = 0; im < cm; im++) {
+        var dm = Math.abs(im / (cm - 1) - 0.5) * 2, hm = Math.max(1.5, v[Math.min(n - 1, Math.floor(dm * (n - 1)))] * maxH / 2);
+        var xm = im * bwm + gm / 2, wm = bwm - gm, rm = Math.min(wm / 2, 2);
+        fctx.beginPath(); if (fctx.roundRect) fctx.roundRect(xm, mid - hm, wm, hm * 2, rm); else fctx.rect(xm, mid - hm, wm, hm * 2); fctx.fill();
+      }
+      fctx.globalAlpha = 1; return;
+    }
     if (w.style === 'bars') {
       var cnt = Math.max(8, Math.floor(W / 7)), bw = W / cnt, gap = Math.max(1, bw * 0.3);
       fctx.fillStyle = grad; fctx.globalAlpha = 0.85;
@@ -2470,12 +2799,137 @@
   var fxLast = 0, fxRunning = false, fxIdleTimer = null;
   // Цикл анимации крутится только пока эффект включён и остров на экране; иначе полностью стоит.
   function fxKick() { if (!fxRunning) { fxRunning = true; requestAnimationFrame(fxFrame); } }
+  /* ---------- текст песни ---------- */
+  var LY = { key: '', lines: null, plain: false, inst: false, loading: false }, lyTimer = null, lyLast = -2;
+  function lyOn() { return !!(FX && FX.lyrics && FX.lyrics.on); }
+  function lyrParse(lrc) {
+    var out = [];
+    String(lrc).split(/\r?\n/).forEach(function (ln) {
+      var re = /\[(\d+):(\d+(?:[.:]\d+)?)\]/g, m, ts = [], last = 0;
+      while ((m = re.exec(ln))) { ts.push(+m[1] * 60000 + parseFloat(m[2].replace(':', '.')) * 1000); last = re.lastIndex; }
+      var tx = ln.slice(last).trim();
+      ts.forEach(function (tt) { out.push({ t: tt, x: tx }); });
+    });
+    out.sort(function (a, b) { return a.t - b.t; });
+    return out;
+  }
+  function lyrEnsure() {
+    if (!lyOn() || !M.ok || !M.title) return;
+    var k = (M.artist || '') + '|' + M.title;
+    if (LY.key === k) return;
+    LY = { key: k, lines: null, plain: false, inst: false, loading: true, miniTxt: '' }; lyLast = -2;
+    try {
+      window.api.lyricsGet({ artist: M.artist || '', title: M.title, dur: M.dur || 0 }).then(function (d) {
+        if (LY.key !== k) return;
+        LY.loading = false;
+        if (d && d.synced) LY.lines = lyrParse(d.synced);
+        LY.plain = !!(d && d.plain); LY.inst = !!(d && d.inst);
+        lyLast = -2; lyrDraw();
+      }).catch(function () { LY.loading = false; lyrDraw(); });
+    } catch (e) { LY.loading = false; }
+  }
+  function lyrIdx() {
+    if (!LY.lines || !LY.lines.length) return -1;
+    var p = curPos() + 300, i = -1;
+    for (var j = 0; j < LY.lines.length; j++) { if (LY.lines[j].t <= p) i = j; else break; }
+    return i;
+  }
+  // force — из draw(): заново выставить строку в свёрнутом острове
+  function lyrDraw(force) {
+    var box = $('lyr'), on = lyOn() && M.ok;
+    island.classList.toggle('haslyr', on);
+    if (!box) return;
+    box.hidden = !on;
+    if (!on) { if (LY.miniTxt) { LY.miniTxt = ''; if (force !== true) try { draw(); } catch (e) {} } return; }
+    lyrEnsure();
+    var i = lyrIdx(), L = LY.lines;
+    if (i === lyLast && !force) return;
+    lyLast = i;
+    var msg = '';
+    if (LY.loading) msg = t('lyrLoading');
+    else if (LY.inst) msg = t('lyrInst');
+    else if (!L || !L.length) msg = LY.plain ? t('lyrNoSync') : t('lyrNone');
+    box.classList.toggle('msg', !!msg);
+    if (msg) { $('ly0').textContent = ''; $('ly1').textContent = msg; $('ly2').textContent = ''; }
+    else {
+      $('ly0').textContent = i > 0 ? L[i - 1].x : '';
+      $('ly1').textContent = i >= 0 ? (L[i].x || '♪') : '♪';
+      $('ly2').textContent = L[i + 1] ? L[i + 1].x : '';
+    }
+    // строка в свёрнутом острове вместо названия трека
+    lyrFit();
+    var mini = FX.lyrics.mini !== false && !msg && i >= 0 && L[i].x ? L[i].x : '';
+    var mChanged = LY.miniTxt !== mini;
+    LY.miniTxt = mini;
+    if (mini) $('mc2').textContent = mini;
+    else if (force !== true) $('mc2').textContent = M.title || t('untitled');
+    if (mChanged && force !== true) { try { draw(); } catch (e) {} } // новая строка — пересчитать размер острова
+  }
+  // подгоняем высоту острова под текст: длинная строка переносится, и остров становится выше
+  var lyrCv = null;
+  function lyrMeasure(txt) {
+    try {
+      if (!lyrCv) lyrCv = document.createElement('canvas').getContext('2d');
+      var cs = getComputedStyle($('mc2'));
+      lyrCv.font = '600 13px ' + (cs.fontFamily || 'sans-serif'); // как у строки в одну линию
+      return Math.ceil(lyrCv.measureText(txt).width) + 4;
+    } catch (e) { return txt.length * 7; }
+  }
+  var lyrMeas = null;
+  function lyrTextH(txt, width) {
+    if (!lyrMeas) {
+      lyrMeas = document.createElement('div');
+      lyrMeas.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:normal;overflow-wrap:anywhere;font-weight:600;font-size:12.5px;line-height:15px;';
+      document.body.appendChild(lyrMeas);
+    }
+    lyrMeas.style.fontFamily = getComputedStyle($('mc2')).fontFamily;
+    lyrMeas.style.width = Math.round(width) + 'px';
+    lyrMeas.textContent = txt;
+    return Math.min(60, lyrMeas.offsetHeight || 15);
+  }
+  function lyrFit() {
+    var box = $('lyr'); if (!box || box.hidden) return;
+    var h = box.offsetHeight; if (!h) return; // остров свёрнут — измерим, когда раскроется
+    var v = Math.max(62, Math.round(h)) + 'px';
+    if (island.style.getPropertyValue('--lyrh') !== v) island.style.setProperty('--lyrh', v);
+  }
+  function lyrSync() {
+    var need = lyOn();
+    if (need && !lyTimer) lyTimer = setInterval(function () { if (M.ok && M.status === 'Playing') lyrDraw(); }, 250);
+    if (!need && lyTimer) { clearInterval(lyTimer); lyTimer = null; }
+    lyLast = -2; try { lyrDraw(); } catch (e) {}
+  }
+  var fxProg = 1, fxPulse = 0, fxPulseOn = false, fxGrowLast = 0;
+  // «Остров по треку»: сам остров растёт вместе с волной — в начале песни короткий, к концу длинный
+  function fxGrowW(md) {
+    if (!FX || !FX.wave.on || FX.wave.len !== 'track' || !M.ok || !(M.dur > 0)) return 0;
+    if (!(md === 'idle' || md === 'multi' || md === 'pop')) return 0;
+    var pr = Math.max(0, Math.min(1, curPos() / M.dur));
+    return Math.round(110 + (330 - 110) * pr);
+  }
+  function fxPulseOff() { if (fxPulseOn) { fxPulseOn = false; fxPulse = 0; island.style.removeProperty('--ipulse'); island.style.boxShadow = ''; island.style.filter = ''; } }
+  // Остров зависит от музыки: на басах чуть «подпрыгивает» и светится цветом эффекта
+  function fxPulseStep(tm, md) {
+    var playing = M.ok && M.status === 'Playing';
+    if (FX.pulse !== true || !playing || !(md === 'idle' || md === 'multi' || md === 'pop')) { fxPulseOff(); return; }
+    if (!FX.wave.on && !FX.grass.music) fxReadBands(24, 60);
+    var bass = 0; for (var i = 0; i < 3 && i < fxBands.length; i++) bass = Math.max(bass, fxBands[i] || 0);
+    var tg = Math.min(1, bass * 0.7 + fxLevel * 0.9);
+    fxPulse += (tg - fxPulse) * (tg > fxPulse ? 0.55 : 0.14);
+    fxPulseOn = true;
+    island.style.setProperty('--ipulse', (1 + fxPulse * 0.07).toFixed(3));
+    var c = FX.wave.on ? fxWaveColor(0.5, tm) : [125, 70, 50];
+    // свечение повторяет скруглённую форму острова (drop-shadow), и не такое большое, чтобы не упираться в край окна
+    island.style.filter = 'drop-shadow(0 0 ' + (3 + fxPulse * 7).toFixed(1) + 'px ' + fxHsl(c, (0.35 + fxPulse * 0.5).toFixed(2)) + ')';
+  }
+  function fxGrassIn() { return FX && FX.grass.on; }
   function fxFrame(now) {
-    var on = FX && (FX.grass.on || FX.wave.on);
+    var on = FX && (fxGrassIn() || FX.wave.on);
     var md = island.dataset.mode;
     var show = on && !island.classList.contains('gone') && md !== 'game';
     if (!show) {
       if (!fxc.hidden) fxc.hidden = true;
+      fxPulseOff();
       fxRunning = false;
       clearTimeout(fxIdleTimer); if (on) fxIdleTimer = setTimeout(fxKick, 1500); // проверим позже, не появился ли остров
       return;
@@ -2489,22 +2943,55 @@
     if (fxc.width !== Math.round(W * dpr) || fxc.height !== Math.round(H * dpr)) { fxc.width = Math.round(W * dpr); fxc.height = Math.round(H * dpr); }
     fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     fctx.clearRect(0, 0, W, H);
-    var tm = now / 1000, big = md === 'full' || md === 'notif';
-    if (FX.wave.on || FX.grass.music) fxInitAudio();
-    if (FX.wave.on) fxDrawWave(tm, W, H, H * (FX.wave.height / 160) * (big ? 0.3 : 0.55));
-    else if (FX.grass.music) fxReadBands(24, 60);
-    if (FX.grass.on) fxDrawGrass(tm, W, Math.round(FX.grass.height * (big ? 0.3 : 0.2)));
+    var tm = now / 1000, big = md === 'full' || md === 'notif', clear = island.classList.contains('fxclear'), pure = (FX.pure || clear) && !big;
+    if (FX.wave.on || FX.grass.music || FX.pulse === true) fxInitAudio();
+    // в режиме «только эффекты» волна и трава занимают весь остров
+    // трава снизу — волна уходит наверх, чтобы не перекрывались
+    var gIn = fxGrassIn();
+    var wFlip = FX.wave.on && gIn && FX.grass.pos === 'bottom' && FX.wave.style !== 'mirror';
+    // «По треку»: в начале песни волна узкая, к концу — во всю ширину (растёт от центра)
+    var gw = fxGrowW(md);
+    if (!!gw !== !!fxGrowLast) { fxGrowLast = gw; draw(); }
+    else if (gw && gw !== fxGrowLast) { fxGrowLast = gw; island.style.width = gw + 'px'; }
+    var pTarget = 1;
+    if (!gw && FX.wave.len === 'track' && M.ok && M.dur > 0) pTarget = Math.max(0, Math.min(1, curPos() / M.dur));
+    fxProg += (pTarget - fxProg) * (Math.abs(pTarget - fxProg) > 0.3 ? 0.12 : 0.5);
+    var wW = Math.max(14, W * fxProg);
+    if (wFlip) { fctx.save(); fctx.translate(0, H); fctx.scale(1, -1); }
+    if (FX.wave.on) {
+      if (wW < W) { fctx.save(); fctx.translate((W - wW) / 2, 0); }
+      // высота волны в свёрнутом острове — от обычной высоты 34px, чтобы выросший под текст остров не заливало волной
+      fxDrawWave(tm, wW, H, (big || pure ? H : Math.min(H, 34)) * (FX.wave.height / 160) * (big ? 0.3 : pure ? (gIn ? 0.75 : 1.1) : 0.55));
+      if (wW < W) fctx.restore();
+    }
+    if (wFlip) fctx.restore();
+    if (!FX.wave.on && FX.grass.music) fxReadBands(24, 60);
+    fxPulseStep(tm, md);
+    if (gIn) {
+      var gh = Math.round(pure ? H * (FX.wave.on ? 0.45 : 0.85) * (0.5 + FX.grass.height / 180) : FX.grass.height * (big ? 0.3 : 0.2));
+      // «Снизу» — трава растёт от нижнего края вверх, «Сверху» — свисает с верхнего
+      var up = FX.grass.pos === 'bottom';
+      if (up) { fctx.save(); fctx.translate(0, H); fctx.scale(1, -1); }
+      fxDrawGrass(tm, W, gh);
+      if (up) fctx.restore();
+    }
   }
   if ($('fxOpen')) $('fxOpen').addEventListener('click', function () { setTab('fx'); });
   if ($('fxBack')) $('fxBack').addEventListener('click', function () { setTab('design'); });
   if ($('fxGrassSw')) $('fxGrassSw').addEventListener('click', function () { fxSet({ grass: { on: !FX.grass.on } }, true); });
   if ($('fxWaveSw')) $('fxWaveSw').addEventListener('click', function () { fxSet({ wave: { on: !FX.wave.on } }, true); });
+  if ($('fxLyrSw')) $('fxLyrSw').addEventListener('click', function () { fxSet({ lyrics: { on: !(FX.lyrics && FX.lyrics.on) } }, true); });
+  if ($('fxLyrMini')) $('fxLyrMini').addEventListener('click', function () { fxSet({ lyrics: { mini: !(FX.lyrics && FX.lyrics.mini !== false) } }, true); });
+  if ($('fxPulseSw')) $('fxPulseSw').addEventListener('click', function () { fxSet({ pulse: FX.pulse !== true }, true); });
   if ($('fxGrassMus')) $('fxGrassMus').addEventListener('click', function () { fxSet({ grass: { music: !FX.grass.music } }, true); });
   qAll('[data-gc]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ grass: { color: b.dataset.gc } }, true); }); });
   qAll('[data-wp]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ wave: { palette: b.dataset.wp } }, true); }); });
   qAll('[data-wind]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ grass: { wind: b.dataset.wind } }, true); }); });
+  qAll('[data-gpos]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ grass: { pos: b.dataset.gpos } }, true); }); });
+  qAll('[data-wlen]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ wave: { len: b.dataset.wlen } }, true); }); });
   qAll('[data-dens]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ grass: { density: b.dataset.dens } }, true); }); });
   qAll('[data-ws]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ wave: { style: b.dataset.ws } }, true); }); });
+  qAll('[data-pure]').forEach(function (b) { b.addEventListener('click', function () { fxSet({ pure: b.dataset.pure === '1' }, true); }); });
   if ($('fxGrassCustom')) $('fxGrassCustom').addEventListener('input', function () { fxSet({ grass: { color: 'custom', custom: $('fxGrassCustom').value } }); });
   if ($('fxWaveCustom')) $('fxWaveCustom').addEventListener('input', function () { fxSet({ wave: { palette: 'custom', custom: $('fxWaveCustom').value } }); });
   if ($('fxGrassH')) $('fxGrassH').addEventListener('input', function () { fxSet({ grass: { height: +$('fxGrassH').value } }); });
@@ -2741,8 +3228,8 @@
       appRows($('fsum'), F.sum.apps, 5);
     }
 
-    var pcv = $('pcv'), pcHas = popCover && !!M.cover;
-    pcv.hidden = !pcHas; if (pcHas) pcv.style.backgroundImage = 'url("' + M.cover + '")'; pcv.classList.toggle('has', pcHas);
+    var pcv = $('pcv'), pcSrc = popImg || (popCover && M.cover) || '', pcHas = !!pcSrc;
+    pcv.hidden = !pcHas; if (pcHas) pcv.style.backgroundImage = 'url("' + pcSrc + '")'; pcv.classList.toggle('has', pcHas);
     var md = mode();
     var music = M.ok && M.status === 'Playing' && !CALL.on;
     // Вертикальная полоска у стены: часы столбиком, обложка и «эквалайзер», когда играет музыка.
@@ -2763,13 +3250,30 @@
     $('csv').textContent = swFmt(swMs()).replace(/\.\d$/, '');
     var wsum = 0, wn = 0;
     ['cclk', 'cr', 'ct', 'cs', 'cc', 'cf'].forEach(function (id) { var el = $(id); if (!el.hidden) { wsum += el.offsetWidth; wn++; } });
-    if (music) { wsum += 200; wn++; }
+    // строка текста песни: ширина острова под всю строку
+    var lyrTxt = music && lyOn() && FX.lyrics.mini !== false && LY.miniTxt ? LY.miniTxt : '';
+    var musW = 200, lyrTW = 0;
+    if (lyrTxt) { lyrTW = lyrMeasure(lyrTxt); musW = 28 + 10 + lyrTW + 10 + 26; }
+    if (music) { wsum += musW; wn++; }
     // не шире окна острова: иначе края обрезаются и остров «ломается» при наведении (лишнее ужимает название трека)
-    var maxW = Math.max(200, Math.floor(((window.innerWidth || 440) - 16) / ((C && SIZE_SCALE && SIZE_SCALE[C.size]) || 1)));
+    // при свечении оставляем запас по краям окна, иначе свечение обрезается и углы выглядят острыми
+    var glowPad = FX && FX.pulse === true && (FX.grass.on || FX.wave.on) ? 28 : 0;
+    var maxW = Math.max(200, Math.floor(((window.innerWidth || 440) - 16 - glowPad) / ((C && curScale()) || 1) / (glowPad ? 1.07 : 1)));
     var wRaw = 28 + wsum + 12 * Math.max(0, wn - 1) + 16;
-    island.classList.toggle('mtight', music && wRaw > maxW); // тесно — у музыки остаются обложка и «эквалайзер», без названия
+    island.classList.toggle('mtight', music && wRaw > maxW && !lyrTxt); // тесно — у музыки остаются обложка и «эквалайзер», без названия
     var w = Math.min(wRaw, 470, maxW);
-    if (music && wRaw > maxW) w = Math.min(w, wRaw - 200 + 80);
+    if (music && wRaw > maxW && !lyrTxt) w = Math.min(w, wRaw - 200 + 80);
+    // переносим строку только если она реально не влезает по ширине; высоту меряем по настоящему тексту
+    var lyrWrap = false;
+    if (lyrTxt && md === 'multi') {
+      var eqEl = document.querySelector('#mm .eq'), eqW = (eqEl && eqEl.offsetWidth) || 22;
+      var avail = w - 28 - (wsum - musW) - 12 * Math.max(0, wn - 1) - 24 - 10 - 10 - eqW;
+      if (lyrTW > avail + 2) {
+        lyrWrap = true;
+        island.style.setProperty('--lyrmh', Math.max(34, lyrTextH(lyrTxt, Math.max(60, avail)) + 12) + 'px');
+      }
+    }
+    island.classList.toggle('lyrwrap', lyrWrap);
     w = Math.max(w, 120);
     var first = true;
     ['cclk', 'cr', 'ct', 'cs', 'cc', 'cf'].forEach(function (id) {
@@ -2778,7 +3282,16 @@
       el.style.paddingLeft = (vis && first && !music) ? '0' : '';
       if (vis) first = false;
     });
-    island.style.width = md === 'multi' ? w + 'px' : '';
+    var fxPure = !!(FX && FX.pure && (FX.grass.on || FX.wave.on)) && (md === 'idle' || md === 'multi' || md === 'pop');
+    var fxClear = !!(FX && FX.grass.on && FX.grass.pos === 'screen') && (md === 'idle' || md === 'multi' || md === 'pop');
+    island.classList.toggle('fxclear', fxClear);
+    if (fxClear) fxPure = true;
+    island.classList.toggle('fxpure', fxPure);
+    if (fxPure && md === 'multi') w = 240;
+    var gw = fxGrowW(md);
+    island.classList.toggle('fxgrow', !!gw);
+    if (gw) { island.classList.add('fxpure'); island.style.width = gw + 'px'; }
+    else island.style.width = md === 'multi' ? w + 'px' : '';
     $('media').hidden = !M.ok;
     $('nomedia').hidden = M.ok;
     var sIco = M.shuffle ? 'assets/shuffle-on.png' : 'assets/shuffle.png';
@@ -2792,6 +3305,7 @@
     $('mt').textContent = M.title || t('untitled');
     $('ma').textContent = (M.artist ? M.artist + ' · ' : '') + appName(M.app);
     $('mc2').textContent = M.title || t('untitled');
+    try { lyrDraw(true); } catch (e) {}
     var fav = isFav();
     $('favBtn').classList.toggle('on', fav);
     $('favIc').textContent = fav ? '♥' : '♡';
@@ -2826,6 +3340,7 @@
 
     drawGame();
     island.dataset.mode = md;
+    if (md === 'full') setTimeout(function () { try { lyrFit(); } catch (e) {} }, 30);
   }
 
   function tick() {
@@ -2843,6 +3358,16 @@
 
   function syncMouse() { window.api.hover(over || pinned || dragging || typing); draw(); }
   island.addEventListener('mouseenter', function () { over = true; syncMouse(); });
+  // Окно пропускает мышь насквозь без глобального хука, поэтому о наведении сообщает главный процесс
+  try { window.api.onHoverPt(function (v) { if (v !== over) { over = v; syncMouse(); } }); } catch (e) {}
+  // Сообщаем главному процессу, где остров (только когда меняется)
+  var rectSent = '';
+  function sendRect() {
+    var r = island.getBoundingClientRect();
+    var k = Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + ',' + Math.round(r.height);
+    if (k !== rectSent) { rectSent = k; try { window.api.islandRect({ x: r.left, y: r.top, w: r.width, h: r.height }); } catch (e) {} }
+  }
+  setInterval(sendRect, 200); sendRect();
   island.addEventListener('mouseleave', function () { over = false; syncMouse(); });
   // Подстраховка: mouseleave иногда не срабатывает у прозрачных always-on-top окон
   // (особенно при быстром уводе мыши), и остров зависает «развёрнутым». Раз в полсекунды

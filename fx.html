@@ -10,7 +10,7 @@
   'use strict';
   var KIND = new URLSearchParams(location.search).get('kind') === 'top' ? 'top' : 'bottom';
   var cv = document.getElementById('c'), ctx = cv.getContext('2d');
-  var S = null, playing = false, running = true, W = 0, H = 0, DPR = 1;
+  var S = null, playing = false, running = true, W = 0, H = 0, DPR = 1, hover = null;
 
   /* ---------- звук компьютера (loopback) ---------- */
   var analyser = null, fdata = null, audioTried = false, level = 0;
@@ -86,7 +86,7 @@
     var g = S.grass, step = g.density === 'low' ? 7 : g.density === 'high' ? 2.6 : 4.2;
     var x = 0;
     while (x < W) {
-      blades.push({ x: x + Math.random() * step, h: g.height * (0.45 + Math.random() * 0.55), w: 2 + Math.random() * 3,
+      blades.push({ x: x + Math.random() * step, h: g.height * (0.45 + Math.random() * 0.55), w: 2 + Math.random() * 3, gr: 1,
         j: Math.random(), ph: Math.random() * 6.28, st: 0.7 + Math.random() * 0.6 });
       x += step * (0.6 + Math.random() * 0.8);
     }
@@ -97,11 +97,18 @@
     var mus = g.music ? Math.min(1, level * 2.2) : 0;
     var base = g.color === 'custom' ? hexHsl(g.custom) : null;
     var gust = Math.sin(t * spd * 0.37) * 0.5 + Math.sin(t * spd * 0.11 + 1.3) * 0.5;
+    // трава под курсором плавно вытягивается вниз, а после ухода мыши медленно возвращается
+    var hv = hover, reach = 0;
+    if (hv) { for (var r = 0; r < blades.length; r++) if (Math.abs(blades[r].x - hv.x) < 40) reach = Math.max(reach, blades[r].h * blades[r].gr); }
+    var active = hv && hv.y < Math.max(g.height * 1.2, reach) + 14;
     for (var i = 0; i < blades.length; i++) {
       var b = blades[i];
+      var tg = 1;
+      if (active) { var dx = Math.abs(b.x - hv.x); if (dx < 170) { var f = Math.cos(dx / 170 * Math.PI / 2); tg = 1 + 1.6 * f * f; } }
+      b.gr += (tg - b.gr) * (tg > b.gr ? 0.16 : 0.035);
       var c = base ? [base[0] + (b.j - .5) * 24, base[1], base[2] * (0.7 + b.j * 0.55)] : (GRASS[g.color] || GRASS.green)(b.j, t, b.x);
       var a = (Math.sin(t * spd * b.st + b.x * 0.012 + b.ph) * 0.6 + gust * 0.6) * amp + mus * 0.25 * Math.sin(t * 9 + b.ph);
-      var hh = b.h * (1 + mus * 0.28), bend = Math.sin(a) * hh, tipY = Math.cos(a) * hh;
+      var hh = b.h * b.gr * (1 + mus * 0.28), bend = Math.sin(a) * hh, tipY = Math.cos(a) * hh;
       ctx.beginPath();
       ctx.moveTo(b.x - b.w, 0);
       ctx.quadraticCurveTo(b.x - b.w * 0.3 + bend * 0.35, tipY * 0.55, b.x + bend, tipY);
@@ -196,6 +203,7 @@
     if (hc) resize();
   });
   window.fx.onMedia(function (p) { playing = !!p; });
+  if (window.fx.onHover) window.fx.onHover(function (p) { hover = p; });
   window.fx.onRun(function (on) { running = !!on; if (!on) ctx.clearRect(0, 0, W, H); });
   resize();
   window.fx.ready();

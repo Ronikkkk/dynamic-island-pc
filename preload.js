@@ -6,6 +6,12 @@ ipcRenderer.on('mem-trim', () => { try { webFrame.clearCache(); } catch (e) {} }
 
 contextBridge.exposeInMainWorld('api', {
   hover: (over) => ipcRenderer.send('hover', !!over),
+  islandRect: (r) => ipcRenderer.send('island-rect', r),
+  onClip: (cb) => ipcRenderer.on('clip', (_e, d) => cb(d)),
+  clipList: () => ipcRenderer.invoke('clip-list'),
+  clipUse: (i) => ipcRenderer.invoke('clip-use', i),
+  clipClear: () => ipcRenderer.invoke('clip-clear'),
+  onHoverPt: (cb) => ipcRenderer.on('hover-pt', (_e, v) => cb(!!v)),
   screenshot: () => ipcRenderer.send('screenshot'),
   focus: (on) => ipcRenderer.invoke('focus', !!on),
   sysStats: () => ipcRenderer.invoke('sys-stats'),
@@ -57,6 +63,7 @@ contextBridge.exposeInMainWorld('api', {
   autohideSet: (on) => ipcRenderer.invoke('autohide-set', !!on),
   gameGet: () => ipcRenderer.invoke('game-get'),
   fxGet: () => ipcRenderer.invoke('fx-get'),
+  lyricsGet: (q) => ipcRenderer.invoke('lyrics-get', q || {}),
   onDl: (cb) => ipcRenderer.on('dl', (_e, d) => cb(d)),
   onDlDone: (cb) => ipcRenderer.on('dl-done', (_e, d) => cb(d)),
   dlOpen: (p) => ipcRenderer.send('dl-open', String(p || '')),

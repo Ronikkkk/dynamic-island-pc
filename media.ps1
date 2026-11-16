@@ -128,6 +128,21 @@ function Check-Foreground {
 }
 
 $lastSig = ''
+$script:shownApp = ''
+# Известные плееры. Другие программы (игры, мессенджеры, оверлеи) тоже регистрируют медиасессию
+# и бывают «Playing» — из-за них остров показывал чужую сессию, а кнопки уходили не в Spotify.
+$knownPlayers = @('spotify', 'music', 'yandex', 'chrome', 'msedge', 'edge', 'firefox', 'opera', 'brave', 'vivaldi', 'vlc', 'aimp', 'foobar', 'itunes', 'deezer', 'soundcloud', 'vk', 'zune', 'winamp', 'musicbee', 'tidal', 'amazon', 'youtube', 'mpc', 'potplayer', 'telegram')
+function Is-Known($x) {
+  try { $id = ([string]$x.SourceAppUserModelId).ToLower() } catch { return $false }
+  foreach ($k in $knownPlayers) { if ($id.Contains($k)) { return $true } }
+  return $false
+}
+# Сессия, которую сейчас показывает остров, — кнопки должны управлять именно ей.
+function Shown-Session {
+  if (-not $script:shownApp) { return $null }
+  try { foreach ($x in @($mgr.GetSessions())) { if ([string]$x.SourceAppUserModelId -eq $script:shownApp) { return $x } } } catch { }
+  return $null
+}
 function Pick-Session {
   $cur = $mgr.GetCurrentSession()
   $list = @()
@@ -141,7 +156,17 @@ function Pick-Session {
   foreach ($x in $list) {
     try { if ($x.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing') { $playing += $x } } catch { }
   }
-  if ($playing.Count -eq 0) { return $cur }
+  $knownPlaying = @($playing | Where-Object { Is-Known $_ })
+  if ($knownPlaying.Count -gt 0) { $playing = $knownPlaying }
+  else {
+    # играет только «чужая» программа — оставляем последний известный плеер (например, Spotify на паузе)
+    $sh = Shown-Session
+    if ($sh -and (Is-Known $sh)) { return $sh }
+  }
+  if ($playing.Count -eq 0) {
+    if ($cur -and -not (Is-Known $cur)) { foreach ($x in $list) { if (Is-Known $x) { return $x } } }
+    return $cur
+  }
   $fp = [string]$script:fgProc
   if ($fp -ne '') {
     $needle = $fp
@@ -152,6 +177,8 @@ function Pick-Session {
       if ($id.Contains($needle) -and -not $id.Contains('music')) { return $x }
     }
   }
+  # не прыгаем между плеерами: если показанная сессия ещё играет — остаёмся на ней
+  foreach ($x in $playing) { if ([string]$x.SourceAppUserModelId -eq $script:shownApp) { return $x } }
   if ($cur) {
     foreach ($x in $playing) { if ([string]$x.SourceAppUserModelId -eq [string]$cur.SourceAppUserModelId) { return $cur } }
   }
@@ -168,7 +195,9 @@ while ($true) {
     if (Test-Path -LiteralPath $CmdFile) {
       $cmd = (Get-Content -LiteralPath $CmdFile -Raw).Trim()
       Remove-Item -LiteralPath $CmdFile -Force -ErrorAction SilentlyContinue
-      $cs = Pick-Session
+      $cs = Shown-Session
+      if (-not $cs) { $cs = Pick-Session }
+      if ($cs) { Log ('cmd ' + $cmd + ' -> ' + $cs.SourceAppUserModelId) }
       if (-not $cs -and ($cmd -eq 'toggle' -or $cmd -eq 'next' -or $cmd -eq 'prev')) {
         # Системного плеера не видно — пробуем медиаклавишей.
         if ($cmd -eq 'next') { Send-MediaKey $VK_NEXT } elseif ($cmd -eq 'prev') { Send-MediaKey $VK_PREV } else { Send-MediaKey $VK_PLAY }
@@ -216,6 +245,7 @@ while ($true) {
       $title = [string]$p.Title
       $artist = [string]$p.Artist
       $app = [string]$s.SourceAppUserModelId
+      $script:shownApp = $app
       $key = $title + '|' + $artist + '|' + $app
 
       $dur = 0.0

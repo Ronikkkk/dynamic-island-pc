@@ -272,7 +272,7 @@ function applyVisibility(byUser) {
   clearTimeout(hideTimer);
   if (visible) {
     win.setAlwaysOnTop(true, 'screen-saver');
-    win.setIgnoreMouseEvents(true, { forward: true });
+    win.setIgnoreMouseEvents(true);
     win.showInactive();
     win.moveTop();
     setTimeout(() => { if (win && !win.isDestroyed()) win.moveTop(); }, 300);
@@ -666,19 +666,28 @@ function cleanCustom(d) {
   homeOrder = homeOrder.filter((x, i) => homeOrder.indexOf(x) === i);
   HOME_WIDGETS_ALL.forEach((x) => { if (homeOrder.indexOf(x) === -1) homeOrder.push(x); });
   const homeHidden = Array.isArray(d.homeHidden) ? d.homeHidden.filter((x) => HOME_WIDGETS_ALL.indexOf(x) >= 0) : [];
-  return { position, size, greeting, posX: num(d.posX), posY: num(d.posY), tabOrder: order, homeOrder, homeHidden };
+  const rng = (v, lo, hi, def) => { v = Number(v); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : def; };
+  return { position, size, greeting, posX: num(d.posX), posY: num(d.posY), tabOrder: order, homeOrder, homeHidden,
+    // плавный размер (ползунок) — точнее, чем S/M/L; null = взять из size
+    scale: d.scale == null ? null : Math.round(rng(d.scale, 0.8, 1.25, 1) * 100) / 100,
+    radius: Math.round(rng(d.radius, 6, 26, 18)), // скругление свёрнутого острова
+    outline: d.outline === true, shadow: Math.round(rng(d.shadow, 0, 100, 45)),
+    font: ['system', 'geo', 'mono'].indexOf(d.font) >= 0 ? d.font : 'system',
+    clip: d.clip !== false, // показывать скопированное в буфер обмена
+    preset: String(d.preset || '').slice(0, 20)
+  };
 }
 let customSettings = cleanCustom((() => { try { return JSON.parse(fs.readFileSync(CUSTOM_FILE, 'utf8')); } catch (e) { return null; } })());
 // Реальные пиксельные размеры окна под выбранный пресет размера — считаются от базовых W×H,
 // поэтому «L» не обрезается собственной рамкой окна при любом разрешении экрана.
-function islandDims(size) {
-  const s = SIZE_SCALE[size] || 1;
+function islandDims(cs) {
+  const s = cs && typeof cs.scale === 'number' ? cs.scale : (SIZE_SCALE[cs && cs.size] || 1);
   return { w: Math.round(W * s), h: Math.round(H * s) };
 }
 // Позиция + размер окна под текущие настройки, всегда прижаты к границам ТЕКУЩЕГО экрана —
 // работает одинаково на любом разрешении/мониторе и пересчитывается заново при каждом вызове.
 function computeIslandBounds(b, cs) {
-  const dims = islandDims(cs.size);
+  const dims = islandDims(cs);
   const clampX = (x) => Math.max(b.x, Math.min(b.x + b.width - dims.w, x));
   const clampY = (y) => Math.max(b.y, Math.min(b.y + b.height - dims.h, y));
   let x, y;
@@ -765,7 +774,7 @@ ipcMain.handle('custom-drag-end', () => {
     // У стены: ставим окно так, чтобы середина вертикальной полоски (top 36px, высота 200px) оказалась там, где отпустили.
     const posY = position === 'custom' ? wb.y : Math.round(wb.y + wb.height / 2 - 136);
     // На панели задач центр острова — там, где отпустили.
-    const posX = position === 'bottom' ? Math.round(wb.x + wb.width / 2 - islandDims(customSettings.size).w / 2) : wb.x;
+    const posX = position === 'bottom' ? Math.round(wb.x + wb.width / 2 - islandDims(customSettings).w / 2) : wb.x;
     customSettings = cleanCustom(Object.assign({}, customSettings, { position, posX, posY }));
     try { fs.writeFileSync(CUSTOM_FILE, JSON.stringify(customSettings, null, 1)); } catch (e) { log('custom save error: ' + e.message); }
     applyCustomBounds(); // возвращаем окно к настоящему размеру острова в итоговой (возможно прилипшей) позиции
@@ -854,16 +863,20 @@ ipcMain.on('dl-open', (_e, p) => {
 // Два отдельных прозрачных окна-полоски (сквозь них проходят клики), создаются только когда эффект включён.
 const FX_FILE = dataPath('fx.json');
 const FX_GRASS_COLORS = ['green', 'autumn', 'sakura', 'ice', 'neon', 'custom'];
-const FX_WAVE_PALETTES = ['neon', 'rainbow', 'fire', 'ocean', 'white', 'custom'];
+const FX_WAVE_PALETTES = ['neon', 'rainbow', 'fire', 'ocean', 'sunset', 'mint', 'white', 'custom'];
 function cleanFx(d) {
-  d = d || {}; const g = d.grass || {}, w = d.wave || {};
+  d = d || {}; const g = d.grass || {}, w = d.wave || {}, ly = d.lyrics || {};
   const hex = (v, def) => (/^#[0-9a-f]{6}$/i.test(String(v)) ? String(v) : def);
   const num = (v, a, b, def) => (typeof v === 'number' && isFinite(v) ? Math.max(a, Math.min(b, Math.round(v))) : def);
   return {
+    pulse: d.pulse === true, // (выключено) остров «дышит» в такт музыке
+    lyrics: { on: ly.on === true, mini: ly.mini !== false }, // текст песни: в раскрытом острове и строкой в свёрнутом
+    pure: d.pure === true, // «только эффекты»: маленький остров без времени и текста — одна трава/волна
     grass: {
       on: g.on === true,
       color: FX_GRASS_COLORS.indexOf(g.color) >= 0 ? g.color : 'green',
       custom: hex(g.custom, '#5fd35f'),
+      pos: ['top', 'bottom', 'screen'].indexOf(g.pos) >= 0 ? g.pos : 'top', // screen — по верхнему краю экрана, без острова
       wind: ['calm', 'breeze', 'storm'].indexOf(g.wind) >= 0 ? g.wind : 'breeze',
       height: num(g.height, 20, 90, 44),
       density: ['low', 'mid', 'high'].indexOf(g.density) >= 0 ? g.density : 'mid',
@@ -871,11 +884,12 @@ function cleanFx(d) {
     },
     wave: {
       on: w.on === true,
-      style: ['wave', 'line', 'bars'].indexOf(w.style) >= 0 ? w.style : 'wave',
+      style: ['wave', 'line', 'bars', 'mirror'].indexOf(w.style) >= 0 ? w.style : 'wave',
       palette: FX_WAVE_PALETTES.indexOf(w.palette) >= 0 ? w.palette : 'neon',
       custom: hex(w.custom, '#4ea1ff'),
       height: num(w.height, 30, 160, 70),
-      sens: num(w.sens, 0, 100, 60)
+      sens: num(w.sens, 0, 100, 60),
+      len: w.len === 'track' ? 'track' : 'full' // track — ширина волны растёт по ходу трека
     }
   };
 }
@@ -883,7 +897,8 @@ let fxSettings = cleanFx((() => { try { return JSON.parse(fs.readFileSync(FX_FIL
 const fxWins = { top: null, bottom: null };
 function fxBounds(kind) {
   const wa = screen.getPrimaryDisplay().workArea;
-  if (kind === 'top') { const h = Math.round(fxSettings.grass.height * 1.35) + 6; return { x: wa.x, y: wa.y, width: wa.width, height: h }; }
+  // запас по высоте — трава под курсором вырастает примерно в 2.6 раза
+  if (kind === 'top') { const h = Math.round(fxSettings.grass.height * 1.35 * 2.6) + 10; return { x: wa.x, y: wa.y, width: wa.width, height: h }; }
   const h = fxSettings.wave.height + 24;
   return { x: wa.x, y: wa.y + wa.height - h, width: wa.width, height: h };
 }
@@ -904,14 +919,12 @@ function fxCreate(kind) {
 }
 // Эффекты прячутся в играх и полноэкранных окнах и вместе со скрытым островом.
 function fxApply() {
-  // Трава и волна теперь рисуются прямо внутри острова (index.html), отдельные окна-полоски не нужны.
-  ['top', 'bottom'].forEach((k) => { const w = fxWins[k]; if (w && !w.isDestroyed()) w.destroy(); fxWins[k] = null; });
+  // Волна и трава «Сверху/Снизу» рисуются внутри острова (index.html).
+  // Отдельное окно-полоска нужно только для травы «Над экраном» — по всему верхнему краю, без овала острова.
   if (win && !win.isDestroyed()) win.webContents.send('fx-media', mediaPlaying);
-  return;
-  // eslint-disable-next-line no-unreachable
   const allowed = visible && !fg.full && !isGameFg(fg);
   ['top', 'bottom'].forEach((kind) => {
-    const on = kind === 'top' ? fxSettings.grass.on : fxSettings.wave.on;
+    const on = false; // «Над экраном» теперь — прозрачный остров с травой внутри (index.html), окна-полоски не нужны
     let w = fxWins[kind];
     if (!on) { if (w && !w.isDestroyed()) { w.destroy(); fxWins[kind] = null; } return; }
     if (!w || w.isDestroyed()) w = fxCreate(kind);
@@ -921,6 +934,23 @@ function fxApply() {
     w.webContents.send('fx-run', allowed);
     if (allowed) { if (!w.isVisible()) w.showInactive(); } else if (w.isVisible()) w.hide();
   });
+  fxHoverWatch();
+  if (win && !win.isDestroyed() && fxWins.top) { try { win.moveTop(); } catch (e) {} } // остров остаётся над травой
+}
+// Курсор над травой: окно травы пропускает клики, поэтому положение мыши смотрим сами (~11 раз/с, только пока трава на экране).
+let fxHoverTimer = null, fxHoverWas = false;
+function fxHoverWatch() {
+  const w = fxWins.top, need = !!(w && !w.isDestroyed() && w.isVisible());
+  if (!need) { if (fxHoverTimer) { clearInterval(fxHoverTimer); fxHoverTimer = null; } fxHoverWas = false; return; }
+  if (fxHoverTimer) return;
+  fxHoverTimer = setInterval(() => {
+    const ww = fxWins.top;
+    if (!ww || ww.isDestroyed() || !ww.isVisible()) { fxHoverWatch(); return; }
+    const pt = screen.getCursorScreenPoint(), b = ww.getBounds();
+    const inside = pt.x >= b.x && pt.x < b.x + b.width && pt.y >= b.y && pt.y < b.y + b.height;
+    if (inside) { ww.webContents.send('fx-hover', { x: pt.x - b.x, y: pt.y - b.y }); fxHoverWas = true; }
+    else if (fxHoverWas) { ww.webContents.send('fx-hover', null); fxHoverWas = false; }
+  }, 90);
 }
 ipcMain.on('fx-ready', (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
@@ -932,13 +962,114 @@ ipcMain.on('fx-ready', (e) => {
   if (allowed) w.showInactive();
 });
 ipcMain.handle('fx-get', () => fxSettings);
+// ---- Текст песни: открытая база LRCLIB (lrclib.net), строки с таймингом. Ничего не хранится на диске. ----
+const lyrCache = new Map();
+ipcMain.handle('lyrics-get', async (_e, q) => {
+  q = q || {};
+  const artist = String(q.artist || '').slice(0, 200).trim(), title = String(q.title || '').slice(0, 200).trim();
+  const dur = Math.round((+q.dur || 0) / 1000);
+  if (!title) return null;
+  const key = (artist + '|' + title + '|' + dur).toLowerCase();
+  if (lyrCache.has(key)) return lyrCache.get(key);
+  const headers = { 'User-Agent': 'IslandForWindows/' + app.getVersion() + ' (https://github.com/Ronikkkk/dynamic-island-pc)' };
+  const getJson = async (u) => {
+    try {
+      const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 8000);
+      const r = await net.fetch(u, { headers, signal: ctl.signal }); clearTimeout(tm);
+      return r.ok ? await r.json() : null;
+    } catch (e) { return null; }
+  };
+  let d = null;
+  if (artist) {
+    const p = { artist_name: artist, track_name: title }; if (dur) p.duration = String(dur);
+    d = await getJson('https://lrclib.net/api/get?' + new URLSearchParams(p));
+  }
+  if (!d || (!d.syncedLyrics && !d.plainLyrics)) {
+    const arr = await getJson('https://lrclib.net/api/search?' + new URLSearchParams({ q: (artist + ' ' + title).trim() }));
+    if (Array.isArray(arr) && arr.length) {
+      const near = (x) => !dur || !x.duration || Math.abs(x.duration - dur) <= 4;
+      d = arr.find((x) => x.syncedLyrics && near(x)) || arr.find((x) => x.syncedLyrics) || arr[0];
+    }
+  }
+  const res = d ? { synced: String(d.syncedLyrics || ''), plain: String(d.plainLyrics || ''), inst: !!d.instrumental } : { synced: '', plain: '', inst: false };
+  lyrCache.set(key, res);
+  if (lyrCache.size > 80) lyrCache.delete(lyrCache.keys().next().value);
+  return res;
+});
 ipcMain.handle('fx-set', (_e, d) => {
-  fxSettings = cleanFx(Object.assign({}, fxSettings, d, { grass: Object.assign({}, fxSettings.grass, d && d.grass), wave: Object.assign({}, fxSettings.wave, d && d.wave) }));
+  fxSettings = cleanFx(Object.assign({}, fxSettings, d, { grass: Object.assign({}, fxSettings.grass, d && d.grass), wave: Object.assign({}, fxSettings.wave, d && d.wave), lyrics: Object.assign({}, fxSettings.lyrics, d && d.lyrics) }));
   try { fs.writeFileSync(FX_FILE, JSON.stringify(fxSettings, null, 1)); } catch (e) { log('fx save error: ' + e.message); }
   fxApply();
   return fxSettings;
 });
 try { screen.on('display-metrics-changed', () => fxApply()); } catch (e) {}
+
+// ---- Буфер обмена: что скопировали — коротко показываем на острове ----
+// Ничего не пишется на диск: последние 12 записей живут только в памяти, пока работает программа.
+// Пароли из менеджеров паролей помечаются особыми форматами — такие копирования пропускаем.
+let clipLast = null, clipFmts = '', clipImgAt = 0;
+const clipHist = [];
+function clipTick() {
+  if (!win || win.isDestroyed() || !customSettings.clip) return;
+  let fm = [];
+  try { fm = clipboard.availableFormats(); } catch (e) { return; }
+  const fmS = fm.join('|');
+  if (/ExcludeClipboardContentFromMonitorProcessing|Clipboard Viewer Ignore|CanIncludeInClipboardHistory/i.test(fmS)) { clipLast = 'secret'; clipFmts = fmS; return; }
+  let txt = '';
+  try { txt = clipboard.readText() || ''; } catch (e) {}
+  let key = '', img = null;
+  if (txt.trim()) key = 't:' + txt.length + ':' + txt.slice(0, 300) + '|' + txt.slice(-80);
+  else if (fm.some((f) => /^image\//.test(f))) {
+    // картинку читаем только когда сменился набор форматов или раз в 4 с — чтение большой картинки не бесплатное
+    if (fmS === clipFmts && Date.now() - clipImgAt < 4000) return;
+    clipImgAt = Date.now();
+    try { img = clipboard.readImage(); } catch (e) { img = null; }
+    if (!img || img.isEmpty()) { clipFmts = fmS; return; }
+    const sz = img.getSize(), bmp = img.toBitmap();
+    let h = 0; const step = Math.max(4, Math.floor(bmp.length / 4000) * 4);
+    for (let i = 0; i < bmp.length; i += step) h = (h * 31 + bmp[i] + bmp[i + 1] * 7 + bmp[i + 2] * 13) >>> 0;
+    key = 'i:' + sz.width + 'x' + sz.height + ':' + h;
+  } else { clipFmts = fmS; return; }
+  clipFmts = fmS;
+  if (clipLast === null) { clipLast = key; return; } // при запуске не показываем то, что уже было в буфере
+  if (key === clipLast) return;
+  clipLast = key;
+  let item;
+  if (txt.trim()) item = { kind: 'text', text: txt.slice(0, 600), len: txt.length };
+  else {
+    const sz = img.getSize();
+    let th = '';
+    try { th = img.resize({ height: Math.min(96, sz.height) }).toDataURL(); } catch (e) {}
+    item = { kind: 'image', thumb: th, w: sz.width, h: sz.height };
+  }
+  item.at = Date.now(); item.key = key;
+  for (let i = clipHist.length - 1; i >= 0; i--) if (clipHist[i].key === key) clipHist.splice(i, 1);
+  clipHist.unshift(item);
+  if (clipHist.length > 12) clipHist.length = 12;
+  win.webContents.send('clip', item);
+}
+setInterval(clipTick, 800);
+ipcMain.handle('clip-list', () => clipHist.map((x) => Object.assign({}, x)));
+ipcMain.handle('clip-use', (_e, i) => {
+  const it = clipHist[Number(i)];
+  if (!it || it.kind !== 'text') return false;
+  try { clipboard.writeText(it.text); clipLast = 't:' + it.text.length + ':' + it.text.slice(0, 300) + '|' + it.text.slice(-80); } catch (e) { return false; }
+  return true;
+});
+ipcMain.handle('clip-clear', () => { clipHist.length = 0; return true; });
+
+// ---- Наведение на остров без глобального хука мыши ----
+// Раз в 50 мс смотрим, где курсор (GetCursorPos — очень дёшево), и сообщаем окну «над островом / нет».
+let islandRect = null, hoverWas = false;
+setInterval(() => {
+  if (!win || win.isDestroyed() || !visible || !islandRect) { hoverWas = false; return; }
+  let inside = false;
+  try {
+    const pt = screen.getCursorScreenPoint(), b = win.getBounds(), r = islandRect;
+    inside = pt.x >= b.x + r.x - 2 && pt.x <= b.x + r.x + r.w + 2 && pt.y >= b.y + r.y - 2 && pt.y <= b.y + r.y + r.h + 2;
+  } catch (e) { return; }
+  if (inside !== hoverWas) { hoverWas = inside; win.webContents.send('hover-pt', inside); }
+}, 50);
 
 // На панели задач: панель Windows сама «всегда сверху», и после клика по ней встаёт над островом.
 // Поэтому в режиме «Снизу» сразу после смены активного окна и дальше раз в ~0.7 сек поднимаем остров обратно.
@@ -1064,10 +1195,13 @@ async function licVerify(force) {
   try {
     const key = LIC.currentKey();
     if (!key) return;
+    // таймаут 6 с: если сервер недоступен (медленная сеть, блокировка) — не висим, лицензию не трогаем
+    const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 6000);
     const r = await net.fetch(VERIFY_URL, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ key, machine: LIC.machine() })
+      body: JSON.stringify({ key, machine: LIC.machine() }), signal: ctl.signal
     });
+    clearTimeout(tm);
     const j = await r.json();
     if (j && j.ok === false) {
       log('license verify: revoked (' + (j.error || '') + ')');
@@ -1180,7 +1314,9 @@ function createWindow() {
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setVisibleOnAllWorkspaces(true);
   // Пока курсор не над островом, клики проходят сквозь окно.
-  win.setIgnoreMouseEvents(true, { forward: true });
+  // Без { forward: true }: в Windows эта опция ставит глобальный хук мыши, и любая пауза
+  // в программе вызывает подёргивание курсора во всей системе. Наведение отслеживаем сами (hoverPoll).
+  win.setIgnoreMouseEvents(true);
   win.on('closed', () => log('window closed'));
   win.webContents.once('did-finish-load', () => setTimeout(() => { if (win && !win.isDestroyed()) win.webContents.send('greet', greetingText()); }, 900));
   win.loadFile('index.html');
@@ -1345,7 +1481,11 @@ app.whenReady().then(async () => {
 
   ipcMain.on('hover', (_e, over) => {
     if (over) captureBlur(false);
-    if (win) win.setIgnoreMouseEvents(!over, { forward: true });
+    if (win) win.setIgnoreMouseEvents(!over);
+  });
+  // Где на окне сейчас остров (присылает index.html при изменении размера/положения).
+  ipcMain.on('island-rect', (_e, r) => {
+    if (r && isFinite(r.x) && isFinite(r.y) && isFinite(r.w) && isFinite(r.h)) islandRect = { x: +r.x, y: +r.y, w: +r.w, h: +r.h };
   });
   ipcMain.on('media-cmd', (_e, cmd) => {
     if (!/^(toggle|next|prev|shuffle|repeat|seek:\d{1,9})$/.test(cmd)) return;
@@ -1478,8 +1618,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('lic-machine', () => LIC.machine());
   ipcMain.handle('lic-activate', async (_e, k) => {
     const r = LIC.activate(String(k || '').slice(0, 300));
-    if (r && r.ok) await licVerify(true);
-    return LIC.status().pro ? r : (r.ok ? { ok: false, error: 'revoked' } : r);
+    // Ключ проверяется офлайн по подписи — Pro включается сразу. Проверка на сервере идёт в фоне
+    // и не держит окно (раньше при плохой сети активация «зависала» на десятки секунд).
+    if (r && r.ok) licVerify(true);
+    return r;
   });
   ipcMain.on('open-buy', () => {
     const u = BUY_BOT ? 'https://t.me/' + BUY_BOT + '?start=' + encodeURIComponent(LIC.machine()) : 'https://t.me/corzyyy';
